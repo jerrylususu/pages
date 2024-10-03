@@ -3,49 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Page</title>
+    <title>Nekonull's Pages</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: 'Arial', sans-serif;
             display: flex;
             justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem;
         }
         .container {
-            text-align: center;
-            padding: 20px;
-            background-color: #fff;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
+            width: 100%;
+            max-width: 1200px;
         }
         h1 {
-            color: #4CAF50;
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            color: #ffffff;
         }
-        #time {
-            font-size: 1.2rem;
-            color: #555;
-            margin-top: 10px;
+        .section {
+            margin-bottom: 2rem;
+        }
+        .section-title {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+            border-bottom: 2px solid #444;
+            padding-bottom: 0.5rem;
+        }
+        .links-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+        .link-item {
+            flex: 1 1 calc(33.333% - 1.5rem); /* 三列布局 */
+            max-width: calc(33.333% - 1.5rem);
+            background-color: #333333;
+            padding: 1rem;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+            box-sizing: border-box;
+            min-width: 250px;
+        }
+        .link-item:hover {
+            background-color: #444444;
+        }
+        a {
+            text-decoration: none;
+            color: #1e90ff;
+            font-size: 1.5rem;
+            transition: color 0.3s ease;
+        }
+        a:hover {
+            color: #ff9800;
+        }
+        p.description {
+            font-size: 0.9rem;
+            color: #bbbbbb;
+            margin: 0.5rem 0 0;
+        }
+        .github-link {
+            display: inline-block;
+            margin: 2rem auto 0; /* 上边距 2rem，自动水平居中 */
+            padding: 0.8rem 1.5rem;
+            background-color: #24292e;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1rem;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+            text-align: center;
+        }
+        .github-link:hover {
+            background-color: #2ea44f;
+        }
+        .end-links {
+            text-align: center;
+        }
+        @media (max-width: 1024px) {
+            .link-item {
+                flex: 1 1 calc(50% - 1.5rem); /* 两列布局 */
+                max-width: calc(50% - 1.5rem);
+            }
+        }
+        @media (max-width: 768px) {
+            .link-item {
+                flex: 1 1 calc(50% - 1.5rem); /* 保持两列布局 */
+            }
+        }
+        @media (max-width: 480px) {
+            .link-item {
+                flex: 1 1 100%; /* 小屏幕一列布局 */
+                max-width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>It works</h1>
-        <p id="time">Loading time...</p>
+
+<div class="container">
+    <h1>Nekonull's Pages</h1>
+    
+    <div class="section">
+        <h2 class="section-title">Section 1: Introduction</h2>
+        <div class="links-grid">
+            <div class="link-item">
+                <a href="page1.html" target="_blank">Page 1</a>
+                <p class="description">This is the description for Page 1. It provides a brief overview of the content.</p>
+            </div>
+            <div class="link-item">
+                <a href="page2.html" target="_blank">Page 2</a>
+                <p class="description">This is the description for Page 2. It includes more detailed information about the topic.</p>
+            </div>
+            <div class="link-item">
+                <a href="page3.html" target="_blank">Page 3</a>
+                <p class="description">This is the description for Page 3. This page covers advanced concepts and examples.</p>
+            </div>
+        </div>
     </div>
 
-    <script>
-        function updateTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString();
-            document.getElementById('time').textContent = "Current Time: " + timeString;
-        }
-        updateTime();
-        setInterval(updateTime, 1000);  // Update every second
-    </script>
+    <div class="section">
+        <h2 class="section-title">Section 2: Advanced Topics</h2>
+        <div class="links-grid">
+            <div class="link-item">
+                <a href="advanced1.html" target="_blank">Advanced Page 1</a>
+                <p class="description">This is the description for Advanced Page 1. It discusses complex concepts in depth.</p>
+            </div>
+            <div class="link-item">
+                <a href="advanced2.html" target="_blank">Advanced Page 2</a>
+                <p class="description">This is the description for Advanced Page 2. It explores real-world applications.</p>
+            </div>
+            <div class="link-item">
+                <a href="advanced3.html" target="_blank">Advanced Page 3</a>
+                <p class="description">This is the description for Advanced Page 3. It provides case studies and examples.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub 链接 -->
+    <div class="end-links">
+        <a class="github-link" href="https://github.com/yourusername" target="_blank">Visit My GitHub</a>
+    </div>
+</div>
+
 </body>
 </html>
