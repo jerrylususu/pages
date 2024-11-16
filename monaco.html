@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monaco Editor</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .toolbar {
+            height: 40px;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #454545;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+        }
+        #language-picker {
+            padding: 5px;
+            background-color: #2d2d2d;
+            color: white;
+            border: 1px solid #454545;
+            border-radius: 3px;
+            font-size: 14px;
+            outline: none;
+        }
+        #language-picker:hover {
+            background-color: #3d3d3d;
+        }
+        #editor-container {
+            flex: 1;
+            position: relative;
+        }
+        #editor {
+            width: 100%;
+            height: 100%;
+        }
+        .toolbar-btn {
+            margin-left: 10px;
+            padding: 5px 10px;
+            background-color: #2d2d2d;
+            color: white;
+            border: 1px solid #454545;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .toolbar-btn:hover {
+            background-color: #3d3d3d;
+        }
+        .toolbar-select {
+            margin-left: 10px;
+            padding: 5px;
+            background-color: #2d2d2d;
+            color: white;
+            border: 1px solid #454545;
+            border-radius: 3px;
+        }
+        .storage-info {
+            margin-left: auto;
+            color: #888;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <select id="language-picker"></select>
+        <button id="save-btn" class="toolbar-btn">保存</button>
+        <select id="file-picker" class="toolbar-select">
+            <option value="">选择已保存的文件</option>
+        </select>
+        <button id="delete-btn" class="toolbar-btn">删除</button>
+        <button id="download-btn" class="toolbar-btn">下载</button>
+        <button id="diff-btn" class="toolbar-btn">Diff</button>
+        <span id="storage-usage" class="storage-info"></span>
+    </div>
+    <div id="editor-container">
+        <div id="editor"></div>
+    </div>
+
+    <!-- 加载 Monaco Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs/loader.js"></script>
+    <script>
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+
+            // 首先声明所有常量
+            const AUTO_SAVE_KEY = 'monaco_last_modified';
+            const AUTO_SAVE_INTERVAL = 1000;
+            const TEMP_STORAGE_KEY = 'monaco_temp_content';
+            let autoSaveTimer = null;
+
+            // 添加 URL 参数解析函数
+            function getUrlParams() {
+                const params = new URLSearchParams(window.location.search);
+                return {
+                    language: params.get('language') || 'plaintext',
+                    content: params.get('content') || '// 按 F1 或 Alt+Shift+P 打开命令面板\n'
+                };
+            }
+            
+            // 获取 URL 参数
+            const urlParams = getUrlParams();
+            
+            // 确保 editor 变量在外部作用域
+            var editor;
+            
+            // 更新存储空间使用情况
+            function updateStorageUsage() {
+                let total = 0;
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('monaco_') && key !== TEMP_STORAGE_KEY) {
+                        total += localStorage.getItem(key).length;
+                    }
+                }
+                storageUsage.textContent = `存储空间: ${(total / 1024).toFixed(2)} KB`;
+            }
+
+            // 更新文件列表
+            function updateFileList() {
+                filePicker.innerHTML = '<option value="">选择已保存的文件</option>';
+                
+                // 添加其他文件
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('monaco_') && 
+                        key !== AUTO_SAVE_KEY && 
+                        key !== TEMP_STORAGE_KEY) {
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.text = key.replace('monaco_', '');
+                        filePicker.appendChild(option);
+                    }
+                }
+                updateStorageUsage();
+            }
+
+            // 初始化编辑器
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: urlParams.content,
+                language: urlParams.language,
+                theme: 'vs-dark',
+                automaticLayout: true
+            });
+
+            // 更新语言选择器的默认选中项
+            var languagePicker = document.getElementById('language-picker');
+            var languages = monaco.languages.getLanguages();
+            
+            languages.sort((a, b) => a.id.localeCompare(b.id));
+            
+            languages.forEach(function(lang) {
+                var option = document.createElement('option');
+                option.value = lang.id;
+                option.text = lang.id;
+                if (lang.id === urlParams.language) {
+                    option.selected = true;
+                }
+                languagePicker.appendChild(option);
+            });
+
+            // 监听语言选择变化
+            languagePicker.addEventListener('change', function() {
+                monaco.editor.setModelLanguage(editor.getModel(), this.value);
+            });
+
+            editor.addCommand(monaco.KeyMod.Alt | monaco.KeyMod.Shift | monaco.KeyCode.KeyP, function() {
+                editor.trigger('', 'editor.action.quickCommand', null);
+            });
+
+            // 添加文件管理功能
+            const saveBtn = document.getElementById('save-btn');
+            const filePicker = document.getElementById('file-picker');
+            const deleteBtn = document.getElementById('delete-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const storageUsage = document.getElementById('storage-usage');
+
+            // 保存文件
+            saveBtn.addEventListener('click', function() {
+                const fileName = prompt('请输入文件名', new Date().toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }).replace(/[\/\s:]/g, '-'));
+                
+                if (fileName) {
+                    const key = 'monaco_' + fileName;
+                    localStorage.setItem(key, editor.getValue());
+                    updateFileList();
+                }
+            });
+
+            // 加载文件
+            filePicker.addEventListener('change', function() {
+                if (this.value) {
+                    const content = localStorage.getItem(this.value);
+                    if (content) {
+                        editor.setValue(content);
+                    }
+                }
+                // 当选择了文件时，清除自动保存定时器
+                if (this.value && autoSaveTimer) {
+                    clearInterval(autoSaveTimer);
+                    autoSaveTimer = null;
+                } else if (!this.value) {
+                    // 当取消选择文件时，重新启动自动保存
+                    setupAutoSave();
+                }
+            });
+
+            // 删除文件
+            deleteBtn.addEventListener('click', function() {
+                if (filePicker.value) {
+                    const fileName = filePicker.value.replace('monaco_', '');
+                    if (confirm(`确定要删除文件 "${fileName}" 吗？`)) {
+                        localStorage.removeItem(filePicker.value);
+                        updateFileList();
+                    }
+                } else {
+                    alert('请先选择要删除的文件');
+                }
+            });
+
+            // 添加下载按钮功能
+            downloadBtn.addEventListener('click', function() {
+                // 获取默认文件名（如果有选中的文件就用文件名，否则用当前时间）
+                const defaultFileName = filePicker.value ? 
+                    filePicker.value.replace('monaco_', '') : 
+                    new Date().toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    }).replace(/[\/\s:]/g, '-');
+
+                const fileName = prompt('请输入下载文件名', defaultFileName);
+                
+                if (fileName) {
+                    const content = editor.getValue();
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            });
+
+            // 添加 diff 功能
+            const diffBtn = document.getElementById('diff-btn');
+            let isDiffMode = false;
+            let diffEditor = null;
+
+            diffBtn.addEventListener('click', function() {
+                isDiffMode = !isDiffMode;
+                const editorContainer = document.getElementById('editor');
+                
+                if (isDiffMode) {
+                    // 更新按钮文本
+                    diffBtn.textContent = '退出Diff';
+                    
+                    // 保存当前内容
+                    const originalContent = editor.getValue(); // 保存原始内容
+                    const currentLanguage = languagePicker.value;
+                    
+                    // 先销毁原有编辑器
+                    editor.dispose();
+                    
+                    // 创建 diff 编辑器，设置 readOnly 为 false
+                    diffEditor = monaco.editor.createDiffEditor(editorContainer, {
+                        theme: 'vs-dark',
+                        automaticLayout: true,
+                        readOnly: false,
+                        originalEditable: true
+                    });
+
+                    // 创建原始模型和修改后的模型
+                    const originalModel = monaco.editor.createModel(originalContent, currentLanguage);
+                    const modifiedModel = monaco.editor.createModel(originalContent, currentLanguage);
+
+                    diffEditor.setModel({
+                        original: originalModel,
+                        modified: modifiedModel
+                    });
+
+                    editor = diffEditor;
+                } else {
+                    // 更新按钮文本
+                    diffBtn.textContent = 'Diff';
+                    
+                    // 获取修改后的内容并保存到临时存储
+                    const modifiedValue = diffEditor.getModifiedEditor().getValue();
+                    localStorage.setItem(TEMP_STORAGE_KEY, modifiedValue);
+                    
+                    // 销毁 diff 编辑器
+                    diffEditor.dispose();
+                    
+                    // 重新创建普通编辑器，使用修改前的内容
+                    editor = monaco.editor.create(editorContainer, {
+                        value: originalContent,
+                        language: languagePicker.value,
+                        theme: 'vs-dark',
+                        automaticLayout: true
+                    });
+
+                    // 更新存储空间使用情况
+                    updateStorageUsage();
+                }
+            });
+
+            // 初始化文件列表
+            updateFileList();
+
+            // 在 editor 初始化后添加自动保存功能
+            function setupAutoSave() {
+                // 清除已有的定时器
+                if (autoSaveTimer) {
+                    clearInterval(autoSaveTimer);
+                }
+
+                // 设置新的定时器
+                autoSaveTimer = setInterval(() => {
+                    if (!filePicker.value) { // 只在没有选择文件时自动保存
+                        const content = editor.getValue();
+                        localStorage.setItem(AUTO_SAVE_KEY, content);
+                        updateFileList();
+                    }
+                }, AUTO_SAVE_INTERVAL);
+            }
+
+            // 在编辑器初始化完成后启动自动保存
+            setupAutoSave();
+        });
+    </script>
+</body>
+</html>

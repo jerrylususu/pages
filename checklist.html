@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单清单</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            font-size: 16px;
+        }
+        @media (max-width: 600px) {
+            body {
+                margin: 10px auto;
+                padding: 0 15px;
+                font-size: 18px;
+            }
+            .next-item {
+                margin: 15px auto;
+                padding: 15px;
+            }
+            .next-button {
+                padding: 15px 20px;
+                font-size: 18px;
+            }
+            .checklist-item {
+                padding: 12px;
+            }
+            .checklist-item input[type="checkbox"] {
+                width: 20px;
+                height: 20px;
+            }
+            textarea {
+                font-size: 16px;
+            }
+        }
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .checklist-item:hover {
+            background: #e0e0e0;
+        }
+        .checklist-item.done {
+            opacity: 0.7;
+        }
+        .checklist-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .edit-mode .checklist-item {
+            cursor: move;
+        }
+        .edit-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .next-item {
+            text-align: center;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 400px;
+            border-radius: 8px;
+            background: #e6f3ff;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .next-item > div {
+            margin: 0;
+        }
+        .next-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .next-button:hover {
+            background-color: #45a049;
+        }
+        .delete-btn {
+            margin-left: auto;
+            color: red;
+            cursor: pointer;
+            display: none;
+        }
+        .edit-mode .delete-btn {
+            display: block;
+        }
+        #counter {
+            color: #666;
+            margin: 10px 0;
+        }
+        .drag-over {
+            border: 2px dashed #666;
+        }
+        body.dark-mode,
+        body[data-theme="dark"] {
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+        }
+        body.dark-mode .checklist-item,
+        body[data-theme="dark"] .checklist-item {
+            background: #2d2d2d !important;
+        }
+        body.dark-mode .next-item,
+        body[data-theme="dark"] .next-item {
+            background: #1a3045 !important;
+        }
+        body.light-mode,
+        body[data-theme="light"] {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        body.light-mode .checklist-item,
+        body[data-theme="light"] .checklist-item {
+            background: #f5f5f5 !important;
+        }
+        body.light-mode .next-item,
+        body[data-theme="light"] .next-item {
+            background: #e6f3ff !important;
+        }
+        body.dark-mode .next-button {
+            background-color: #5cb85c;
+        }
+        body.dark-mode .next-button:hover {
+            background-color: #4cae4c;
+        }
+        .theme-toggle {
+            margin-left: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .completion-message {
+            text-align: center;
+            font-size: 18px;
+            color: #4CAF50;
+            margin: 40px 0;
+        }
+        body.dark-mode .completion-message {
+            color: #5cb85c;
+        }
+        .list-header {
+            margin-bottom: 20px;
+        }
+        .list-header h2 {
+            margin: 0;
+        }
+        .list-note {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        body.dark-mode .list-note {
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="edit-controls">
+            <div class="list-header">
+                <h2 id="listTitle">清单</h2>
+                <div id="listNote" class="list-note"></div>
+            </div>
+            <div>
+                <button onclick="toggleEditMode()" id="editBtn">编辑</button>
+                <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
+            </div>
+        </div>
+        <div id="counter"></div>
+        <div id="checklist"></div>
+        <div id="nextItem" class="next-item">
+            <button onclick="completeAndContinue()" class="next-button">完成并继续</button>
+        </div>
+    </div>
+
+    <script>
+        let items = [];
+        let editMode = false;
+        let dragItem = null;
+
+        // 初始化
+        function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const d = urlParams.get('d');
+            
+            // URL参数 d 的格式: 标题~备注~任务1|任务2|任务3
+            // 例如: ?d=我的清单~每日任务~买菜|洗衣服|写作业
+            // 标题和备注可选,任务之间用|分隔
+            if (d) {
+                // 解析压缩格式的数据
+                const parts = d.split('~');
+                const title = parts[0] || '清单';
+                let note = '';
+                let tasks = [];
+                
+                if (parts.length === 2) {
+                    // 如果只有两部分，第二部分是任务列表
+                    tasks = parts[1].split('|');
+                } else if (parts.length >= 3) {
+                    // 如果有三部分或更多，第二部分是备注，第三部分是任务列表
+                    note = parts[1];
+                    tasks = parts[2].split('|');
+                }
+                
+                document.getElementById('listTitle').textContent = title;
+                document.getElementById('listNote').textContent = note ? `备注: ${note}` : '';
+                
+                items = tasks.map(text => ({
+                    text,
+                    done: false
+                }));
+            } else {
+                items = [
+                    { text: "一个简单的任务", done: false },
+                    { text: "另一个任务", done: false },
+                    { text: "点击右上角编辑", done: false }
+                ];
+            }
+            render();
+
+            // 主题初始化
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const savedTheme = localStorage.getItem('theme');
+            
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+            } else if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+            } else {
+                // 如果没有保存的设置，使用系统偏好
+                document.body.classList.add(prefersDark ? 'dark-mode' : 'light-mode');
+            }
+        }
+
+        // 渲染清单
+        function render() {
+            const list = document.getElementById('checklist');
+            const nextItemDiv = document.getElementById('nextItem');
+            list.innerHTML = '';
+            
+            items.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = `checklist-item ${item.done ? 'done' : ''}`;
+                div.draggable = editMode;
+                
+                if (!editMode) {
+                    div.onclick = (e) => {
+                        // 如果点击的是复选框本身，不需要额外处理
+                        if (e.target.type !== 'checkbox') {
+                            const checkbox = div.querySelector('input[type="checkbox"]');
+                            checkbox.checked = !checkbox.checked;
+                            toggleItem(index);
+                        }
+                    };
+                }
+                
+                div.innerHTML = `
+                    <input type="checkbox" ${item.done ? 'checked' : ''} 
+                        onchange="toggleItem(${index})" ${editMode ? 'disabled' : ''}>
+                    <span>${item.text}</span>
+                `;
+                
+                list.appendChild(div);
+            });
+
+            // 更新计数器 - 仅在非编辑模式下显示
+            const counter = document.getElementById('counter');
+            if (!editMode) {
+                const doneCount = items.filter(item => item.done).length;
+                counter.textContent = `完成: ${doneCount} / ${items.length}`;
+                counter.style.display = 'block';
+                updateDocumentTitle();
+            } else {
+                counter.style.display = 'none';
+            }
+
+            // 更新下一个待办项
+            const nextItem = items.find(item => !item.done);
+            if (!editMode) {
+                if (nextItem) {
+                    nextItemDiv.innerHTML = `
+                        <div>下一项:</div>
+                        <div>${nextItem.text}</div>
+                        <button onclick="completeNextItem()" class="next-button">完成并继续</button>
+                    `;
+                } else {
+                    nextItemDiv.innerHTML = `
+                        <div class="completion-message">
+                            所有项目均已完成 🎉
+                        </div>
+                    `;
+                }
+            } else {
+                nextItemDiv.innerHTML = '';
+            }
+        }
+
+        // 切换编辑模式
+        function toggleEditMode() {
+            editMode = !editMode;
+            document.getElementById('editBtn').textContent = editMode ? '保存' : '编辑';
+            
+            const checklistDiv = document.getElementById('checklist');
+            const nextItemDiv = document.getElementById('nextItem');
+            const titleElement = document.getElementById('listTitle');
+            const noteElement = document.getElementById('listNote');
+            const counter = document.getElementById('counter');
+            
+            if (editMode) {
+                counter.style.display = 'none';
+                
+                // 添加标题和作者编辑框
+                const titleInput = document.createElement('input');
+                titleInput.type = 'text';
+                titleInput.value = titleElement.textContent;
+                titleInput.style.fontSize = '1.5em';
+                titleInput.style.marginBottom = '10px';
+                titleInput.style.width = '100%';
+                
+                const noteInput = document.createElement('input');
+                noteInput.type = 'text';
+                noteInput.value = noteElement.textContent.replace('备注: ', '');
+                noteInput.placeholder = '备注（可选）';
+                noteInput.style.width = '100%';
+                noteInput.style.marginBottom = '20px';
+                
+                titleElement.replaceWith(titleInput);
+                noteElement.replaceWith(noteInput);
+                
+                // 切换到编辑模式：显示文本框
+                const textarea = document.createElement('textarea');
+                textarea.style.width = '100%';
+                textarea.style.height = '200px';
+                textarea.value = items.map(item => item.text).join('\n');
+                checklistDiv.innerHTML = '';
+                checklistDiv.appendChild(textarea);
+                nextItemDiv.style.display = 'none';
+            } else {
+                counter.style.display = 'block';
+                
+                // 保存编辑内容
+                const titleInput = document.querySelector('input[type="text"]');
+                const noteInput = document.querySelector('input[placeholder="备注（可选）"]');
+                const textarea = checklistDiv.querySelector('textarea');
+                
+                if (textarea) {
+                    const lines = textarea.value.split('\n').filter(line => line.trim());
+                    items = lines.map(text => ({ text, done: false }));
+                    
+                    // 压缩数据格式
+                    const title = titleInput.value;
+                    const note = noteInput.value;
+                    const tasks = items.map(item => item.text).join('|');
+                    
+                    // 根据是否有作者构建数据字符串
+                    const compressedData = note 
+                        ? `${title}~${note}~${tasks}`
+                        : `${title}~${tasks}`;
+                    
+                    // 更新URL，只使用一个查询参数
+                    const newUrl = `${window.location.pathname}?d=${encodeURIComponent(compressedData)}`;
+                    window.history.pushState({}, '', newUrl);
+                    
+                    // 恢复标题和作者显示
+                    const newTitle = document.createElement('h2');
+                    newTitle.id = 'listTitle';
+                    newTitle.textContent = titleInput.value;
+                    
+                    const newNote = document.createElement('div');
+                    newNote.id = 'listNote';
+                    newNote.className = 'list-note';
+                    newNote.textContent = noteInput.value ? `备注: ${noteInput.value}` : '';
+                    
+                    titleInput.replaceWith(newTitle);
+                    noteInput.replaceWith(newNote);
+                    
+                    alert('保存成功！\n\n请从地址栏复制新的URL以分享您的清单。');
+                }
+                render();
+                updateDocumentTitle();
+                nextItemDiv.style.display = 'block';
+            }
+        }
+
+        // 切换项目状态
+        function toggleItem(index) {
+            items[index].done = !items[index].done;
+            render();
+        }
+
+        // 完成下一个待办项
+        function completeNextItem() {
+            const index = items.findIndex(item => !item.done);
+            if (index !== -1) {
+                items[index].done = true;
+                render();
+            }
+        }
+
+
+        // 修改主题切换函数
+        function toggleTheme() {
+            if (document.body.classList.contains('dark-mode')) {
+                document.body.classList.remove('dark-mode');
+                document.body.classList.add('light-mode');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.classList.remove('light-mode');
+                document.body.classList.add('dark-mode');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // 添加新函数来更新文档标题
+        function updateDocumentTitle() {
+            const title = document.getElementById('listTitle').textContent;
+            const doneCount = items.filter(item => item.done).length;
+            const totalCount = items.length;
+            document.title = `${title} (${doneCount}/${totalCount})`;
+        }
+
+        // 启动应用
+        init();
+    </script>
+</body>
+</html>
