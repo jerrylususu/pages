@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片裁剪压缩工具</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --error-color: #f44336;
+            --border-color: #ddd;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .language-switch {
+            padding: 5px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+
+        .preview-container {
+            position: relative;
+            border: 2px dashed var(--border-color);
+            min-height: 400px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 600px;
+            display: block;
+        }
+
+        .crop-overlay {
+            position: absolute;
+            border: 2px solid var(--primary-color);
+            background-color: rgba(76, 175, 80, 0.1);
+            cursor: move;
+        }
+
+        .controls {
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .control-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        #scaleValue {
+            font-size: 14px;
+            color: #666;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 id="title">图片裁剪压缩工具</h1>
+        <select class="language-switch" id="languageSelect">
+            <option value="zh">简体中文</option>
+            <option value="en">English</option>
+        </select>
+    </div>
+
+    <div class="main-container">
+        <div class="preview-container" id="previewContainer">
+            <div id="uploadPrompt">点击或拖拽图片到此处</div>
+            <img id="previewImage" class="preview-image" style="display: none">
+            <div id="cropOverlay" class="crop-overlay" style="display: none"></div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="fileInput" id="fileInputLabel">选择图片</label>
+                <input type="file" id="fileInput" accept="image/*">
+            </div>
+
+            <div class="control-group">
+                <label for="cropWidth" id="cropWidthLabel">裁剪宽度 (像素)</label>
+                <input type="number" id="cropWidth" min="1">
+            </div>
+
+            <div class="control-group">
+                <label for="cropHeight" id="cropHeightLabel">裁剪高度 (像素)</label>
+                <input type="number" id="cropHeight" min="1">
+            </div>
+
+            <div class="control-group">
+                <label for="targetSize" id="targetSizeLabel">目标文件大小 (KB)</label>
+                <input type="number" id="targetSize" min="1" value="500">
+            </div>
+
+            <div class="control-group">
+                <label for="scaleSlider" id="scaleSliderLabel">缩放比例</label>
+                <input type="range" id="scaleSlider" min="10" max="500" value="100" step="1">
+                <span id="scaleValue">100%</span>
+            </div>
+
+            <button class="btn" id="processButton" disabled>处理图片</button>
+            <button class="btn" id="downloadButton" disabled>下载图片</button>
+
+            <div id="progressBar" class="progress-bar" style="display: none">
+                <div class="progress-bar-fill" id="progressBarFill"></div>
+            </div>
+
+            <div class="control-group" id="resultInfo" style="display: none;">
+                <h3 id="processResultTitle" style="margin-bottom: 10px;">处理结果</h3>
+                <img id="processedPreview" style="width: 100%; margin-bottom: 10px;">
+                <div id="compressionInfo" style="font-size: 14px; color: #666;">
+                    <div>压缩质量: <span id="qualityValue">-</span></div>
+                    <div>文件大小: <span id="fileSizeValue">-</span></div>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="error-message"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+    <script>
+        // 语言配置
+        const translations = {
+            zh: {
+                title: '图片裁剪压缩工具',
+                uploadPrompt: '点击或拖拽图片到此处',
+                fileInput: '选择图片',
+                cropWidth: '裁剪宽度 (像素)',
+                cropHeight: '裁剪高度 (像素)',
+                targetSize: '目标文件大小 (KB)',
+                process: '处理图片',
+                download: '下载图片',
+                errorSize: '无法达到目标文件大小，请尝试更大的值',
+                errorFormat: '请选择有效的图片文件',
+                errorDimensions: '请输入有效的裁剪尺寸',
+                scaleSlider: '缩放比例',
+                processResult: '处理结果',
+                compressionQuality: '压缩质量',
+                fileSize: '文件大小'
+            },
+            en: {
+                title: 'Image Crop & Compress Tool',
+                uploadPrompt: 'Click or drag image here',
+                fileInput: 'Choose Image',
+                cropWidth: 'Crop Width (pixels)',
+                cropHeight: 'Crop Height (pixels)',
+                targetSize: 'Target Size (KB)',
+                process: 'Process Image',
+                download: 'Download Image',
+                errorSize: 'Cannot achieve target file size. Please try a larger value',
+                errorFormat: 'Please select a valid image file',
+                errorDimensions: 'Please enter valid crop dimensions',
+                scaleSlider: 'Scale',
+                processResult: 'Process Result',
+                compressionQuality: 'Compression Quality',
+                fileSize: 'File Size'
+            }
+        };
+
+        // 当前语言
+        let currentLang = 'zh';
+
+        // DOM 元素
+        const elements = {
+            languageSelect: document.getElementById('languageSelect'),
+            title: document.getElementById('title'),
+            uploadPrompt: document.getElementById('uploadPrompt'),
+            previewContainer: document.getElementById('previewContainer'),
+            previewImage: document.getElementById('previewImage'),
+            cropOverlay: document.getElementById('cropOverlay'),
+            fileInput: document.getElementById('fileInput'),
+            fileInputLabel: document.getElementById('fileInputLabel'),
+            cropWidth: document.getElementById('cropWidth'),
+            cropHeight: document.getElementById('cropHeight'),
+            cropWidthLabel: document.getElementById('cropWidthLabel'),
+            cropHeightLabel: document.getElementById('cropHeightLabel'),
+            targetSize: document.getElementById('targetSize'),
+            targetSizeLabel: document.getElementById('targetSizeLabel'),
+            processButton: document.getElementById('processButton'),
+            downloadButton: document.getElementById('downloadButton'),
+            progressBar: document.getElementById('progressBar'),
+            progressBarFill: document.getElementById('progressBarFill'),
+            errorMessage: document.getElementById('errorMessage'),
+            scaleSlider: document.getElementById('scaleSlider'),
+            scaleSliderLabel: document.getElementById('scaleSliderLabel'),
+            scaleValue: document.getElementById('scaleValue'),
+            resultInfo: document.getElementById('resultInfo'),
+            processResultTitle: document.getElementById('processResultTitle'),
+            processedPreview: document.getElementById('processedPreview'),
+            qualityValue: document.getElementById('qualityValue'),
+            fileSizeValue: document.getElementById('fileSizeValue')
+        };
+
+        // 更新界面语言
+        function updateLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang];
+            
+            elements.title.textContent = t.title;
+            elements.uploadPrompt.textContent = t.uploadPrompt;
+            elements.fileInputLabel.textContent = t.fileInput;
+            elements.cropWidthLabel.textContent = t.cropWidth;
+            elements.cropHeightLabel.textContent = t.cropHeight;
+            elements.targetSizeLabel.textContent = t.targetSize;
+            elements.processButton.textContent = t.process;
+            elements.downloadButton.textContent = t.download;
+            elements.scaleSliderLabel.textContent = t.scaleSlider;
+            elements.processResultTitle.textContent = t.processResult;
+        }
+
+        // 语言切换事件
+        elements.languageSelect.addEventListener('change', (e) => {
+            updateLanguage(e.target.value);
+        });
+
+        // 图片处理相关变量
+        let originalImage = null;
+        let processedImage = null;
+        let cropData = {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0
+        };
+
+        // 文件选择处理
+        elements.fileInput.addEventListener('change', handleFileSelect);
+        elements.previewContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        elements.previewContainer.addEventListener('drop', handleFileDrop);
+
+        // 处理文件选择
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                loadImage(file);
+            }
+        }
+
+        // 处理文件拖放
+        function handleFileDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadImage(file);
+            } else {
+                showError(translations[currentLang].errorFormat);
+            }
+        }
+
+        // 加载图片
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    originalImage = img;
+                    elements.previewImage.src = e.target.result;
+                    elements.previewImage.style.display = 'block';
+                    elements.uploadPrompt.style.display = 'none';
+                    elements.processButton.disabled = false;
+                    
+                    // 设置默认裁剪尺寸
+                    elements.cropWidth.value = img.width;
+                    elements.cropHeight.value = img.height;
+                    updateCropOverlay();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 更新裁剪框
+        function updateCropOverlay() {
+            const width = parseInt(elements.cropWidth.value) || 0;
+            const height = parseInt(elements.cropHeight.value) || 0;
+            
+            if (width && height && originalImage) {
+                const scale = elements.previewImage.width / originalImage.width;
+                const scaleMultiplier = parseInt(elements.scaleSlider.value) / 100;
+                
+                // 计算新的尺寸，但不超过原图尺寸
+                const newWidth = Math.min(width * scale * scaleMultiplier, elements.previewImage.width);
+                const newHeight = Math.min(height * scale * scaleMultiplier, elements.previewImage.height);
+                
+                // 获取当前裁剪框的位置
+                const currentLeft = parseFloat(elements.cropOverlay.style.left) || 0;
+                const currentTop = parseFloat(elements.cropOverlay.style.top) || 0;
+                const currentWidth = parseFloat(elements.cropOverlay.style.width) || newWidth;
+                const currentHeight = parseFloat(elements.cropOverlay.style.height) || newHeight;
+                
+                // 计算中心点
+                const centerX = currentLeft + currentWidth / 2;
+                const centerY = currentTop + currentHeight / 2;
+                
+                // 计算新的位置，保持中心点不变
+                let newLeft = centerX - newWidth / 2;
+                let newTop = centerY - newHeight / 2;
+                
+                // 确保裁剪框不会超出图片边界
+                newLeft = Math.max(0, Math.min(newLeft, elements.previewImage.width - newWidth));
+                newTop = Math.max(0, Math.min(newTop, elements.previewImage.height - newHeight));
+                
+                // 更新裁剪框样式
+                elements.cropOverlay.style.display = 'block';
+                elements.cropOverlay.style.width = `${newWidth}px`;
+                elements.cropOverlay.style.height = `${newHeight}px`;
+                elements.cropOverlay.style.left = `${newLeft}px`;
+                elements.cropOverlay.style.top = `${newTop}px`;
+                
+                // 更新裁剪数据
+                cropData = {
+                    x: newLeft / scale,
+                    y: newTop / scale,
+                    width: width * scaleMultiplier,
+                    height: height * scaleMultiplier
+                };
+            }
+        }
+
+        // 使裁剪框可拖动
+        let isDragging = false;
+        let startX, startY;
+
+        elements.cropOverlay.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - elements.cropOverlay.offsetLeft;
+            startY = e.clientY - elements.cropOverlay.offsetTop;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            const left = e.clientX - startX;
+            const top = e.clientY - startY;
+            
+            // 确保裁剪框不超出图片边界
+            const maxX = elements.previewImage.width - elements.cropOverlay.offsetWidth;
+            const maxY = elements.previewImage.height - elements.cropOverlay.offsetHeight;
+            
+            const newLeft = Math.min(Math.max(0, left), maxX);
+            const newTop = Math.min(Math.max(0, top), maxY);
+            
+            elements.cropOverlay.style.left = `${newLeft}px`;
+            elements.cropOverlay.style.top = `${newTop}px`;
+            
+            // 更新裁剪数据
+            const scale = elements.previewImage.width / originalImage.width;
+            cropData.x = newLeft / scale;
+            cropData.y = newTop / scale;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // 处理图片
+        elements.processButton.addEventListener('click', async () => {
+            if (!originalImage) return;
+
+            const targetSize = parseInt(elements.targetSize.value) * 1024; // 转换为字节
+            
+            try {
+                elements.progressBar.style.display = 'block';
+                elements.processButton.disabled = true;
+                elements.errorMessage.textContent = '';
+
+                // 创建离屏canvas进行裁剪
+                const canvas = document.createElement('canvas');
+                canvas.width = parseInt(elements.cropWidth.value);
+                canvas.height = parseInt(elements.cropHeight.value);
+                const ctx = canvas.getContext('2d');
+                
+                ctx.drawImage(
+                    originalImage,
+                    cropData.x, cropData.y,
+                    cropData.width, cropData.height,
+                    0, 0,
+                    canvas.width, canvas.height
+                );
+
+                // 使用二分搜索找到合适的压缩质量
+                let left = 0.01;  // 最低质量
+                let right = 1.0;  // 最高质量
+                let bestBlob = null;
+                let bestQuality = 0;
+                let attempts = 0;
+                const maxAttempts = 20; // 限制最大尝试次数
+                
+                while (right - left > 0.01 && attempts < maxAttempts) {  // 精确到0.01
+                    attempts++;
+                    const mid = (left + right) / 2;
+                    elements.progressBarFill.style.width = `${((1 - (right - left)) * 100)}%`;
+                    
+                    const blob = await new Promise((resolve) => {
+                        canvas.toBlob((b) => resolve(b), 'image/jpeg', mid);
+                    });
+
+                    if (!blob) {
+                        showError(translations[currentLang].errorFormat);
+                        return;
+                    }
+
+                    if (blob.size <= targetSize) {
+                        // 当前质量可以达到目标大小，尝试提高质量
+                        left = mid;
+                        bestBlob = blob;
+                        bestQuality = mid;
+                    } else {
+                        // 当前质量导致文件过大，需要降低质量
+                        right = mid;
+                    }
+                }
+
+                // 如果没有找到合适的质量设置
+                if (!bestBlob) {
+                    // 尝试最低质量
+                    const lowestQualityBlob = await new Promise((resolve) => {
+                        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.01);
+                    });
+
+                    if (!lowestQualityBlob || lowestQualityBlob.size > targetSize) {
+                        showError(translations[currentLang].errorSize);
+                        elements.downloadButton.disabled = true;
+                        return;
+                    }
+
+                    bestBlob = lowestQualityBlob;
+                    bestQuality = 0.01;
+                }
+
+                // 创建处理后的图片URL
+                if (processedImage) {
+                    URL.revokeObjectURL(processedImage); // 清理旧的URL
+                }
+                processedImage = URL.createObjectURL(bestBlob);
+                elements.downloadButton.disabled = false;
+                
+                // 显示压缩信息
+                console.log(`Final compression quality: ${bestQuality.toFixed(2)}`);
+                console.log(`Final file size: ${(bestBlob.size / 1024).toFixed(2)}KB`);
+                
+                // 显示处理结果
+                elements.resultInfo.style.display = 'block';
+                elements.processedPreview.src = processedImage;
+                elements.qualityValue.textContent = `${(bestQuality * 100).toFixed(0)}%`;
+                elements.fileSizeValue.textContent = `${(bestBlob.size / 1024).toFixed(1)}KB`;
+                
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                elements.processButton.disabled = false;
+                elements.progressBar.style.display = 'none';
+                elements.progressBarFill.style.width = '0%';
+            }
+        });
+
+        // 下载处理后的图片
+        elements.downloadButton.addEventListener('click', () => {
+            if (!processedImage) return;
+            
+            const link = document.createElement('a');
+            link.href = processedImage;
+            link.download = 'processed_image.jpg';
+            link.click();
+        });
+
+        // 显示错误信息
+        function showError(message) {
+            elements.errorMessage.textContent = message;
+        }
+
+        // 监听裁剪尺寸变化
+        elements.cropWidth.addEventListener('input', updateCropOverlay);
+        elements.cropHeight.addEventListener('input', updateCropOverlay);
+
+        // 添加滑块事件监听器
+        elements.scaleSlider.addEventListener('input', (e) => {
+            elements.scaleValue.textContent = `${e.target.value}%`;
+            updateCropOverlay();
+        });
+
+        // 初始化
+        updateLanguage(currentLang);
+    </script>
+</body>
+</html> 
