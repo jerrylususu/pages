@@ -256,8 +256,19 @@
                 return;
             }
 
+            // 克隆SVG以避免修改原始SVG
+            const clonedSvg = svg.cloneNode(true);
+            
+            // 添加必要的CSS样式
+            const styleElement = document.createElement('style');
+            styleElement.textContent = `
+                .tile { fill: #ebedf0; }
+                .weekday-label, .month-label { fill: #666; }
+            `;
+            clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+
             // 创建一个新的SVG字符串，包含完整的样式
-            const svgData = svg.outerHTML;
+            const svgData = new XMLSerializer().serializeToString(clonedSvg);
             const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
             const URL = window.URL || window.webkitURL || window;
             const blobURL = URL.createObjectURL(svgBlob);
@@ -267,15 +278,17 @@
             image.onload = function() {
                 // 创建canvas
                 const canvas = document.createElement('canvas');
+                const scale = 2; // 提高图片质量
+                canvas.width = svg.width.baseVal.value * scale;
+                canvas.height = svg.height.baseVal.value * scale;
                 const context = canvas.getContext('2d');
                 
-                // 设置canvas尺寸
-                canvas.width = svg.width.baseVal.value;
-                canvas.height = svg.height.baseVal.value;
-
                 // 设置白色背景
                 context.fillStyle = 'white';
                 context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 缩放以提高清晰度
+                context.scale(scale, scale);
                 
                 // 绘制图像
                 context.drawImage(image, 0, 0);
@@ -284,9 +297,11 @@
                 const a = document.createElement('a');
                 a.download = '代码活动热力图.png';
                 a.href = canvas.toDataURL('image/png');
-                document.body.appendChild(a);
+                document.body.appendChild(a); // 添加到 DOM 中
                 a.click();
-                document.body.removeChild(a);
+                document.body.removeChild(a); // 清理 DOM
+                
+                // 清理
                 URL.revokeObjectURL(blobURL);
             };
             
