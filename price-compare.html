@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品价格比较器</title>
+    <style>
+        /* 基础样式 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+
+        /* 设置区域 */
+        .settings {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .settings select, .settings input {
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* 添加商品表单 */
+        .add-product {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .add-product input {
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* 商品列表 */
+        .product-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* 商品卡片 */
+        .product-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .product-card.best-price {
+            background: #e8f5e9;
+        }
+
+        .product-card.excluded {
+            opacity: 0.5;
+        }
+
+        .product-card h3 {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 按钮样式 */
+        button {
+            padding: 8px 16px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1565c0;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .product-list {
+                grid-template-columns: 1fr;
+            }
+
+            .settings, .add-product {
+                padding: 15px;
+            }
+
+            /* 修改输入框和按钮的样式 */
+            .settings input {
+                width: auto;
+                min-width: 60px;
+                margin-bottom: 0;
+            }
+
+            .quick-units {
+                display: flex;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 5px;
+                margin: 10px -5px;
+            }
+
+            .quick-units button {
+                flex: 0 0 auto;
+                width: auto;
+                margin: 0 5px;
+                padding: 6px 12px;
+            }
+
+            /* 添加商品区域的响应式布局 */
+            .add-product {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                align-items: center;
+            }
+
+            .add-product input {
+                width: auto;
+                margin: 0;
+            }
+
+            .add-product #productName {
+                flex: 1 1 100%;
+            }
+
+            .add-product #productQuantity,
+            .add-product #productPrice {
+                flex: 1;
+                min-width: 80px;
+            }
+
+            .add-product button {
+                width: auto;
+                margin: 0;
+            }
+
+            .add-product span {
+                margin: 0;
+            }
+
+            /* 商品卡片的响应式布局 */
+            .product-card {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .product-card p {
+                margin: 4px 0;
+            }
+
+            /* 操作按钮区域 */
+            .product-card .actions {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                margin-top: 8px;
+            }
+
+            .product-card button {
+                width: auto;
+                padding: 6px 12px;
+                margin: 0;
+            }
+
+            .product-card label {
+                margin-left: auto;
+            }
+        }
+
+        .quick-units {
+            margin: 10px 0;
+        }
+
+        .quick-units button {
+            margin-right: 8px;
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .quick-units button:hover {
+            background: #d0d0d0;
+        }
+
+        .settings input {
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 120px;
+        }
+
+        /* 添加单位显示的样式 */
+        .add-product span {
+            margin-right: 10px;
+        }
+
+        /* 调整移动端响应式布局 */
+        @media (max-width: 600px) {
+            .add-product span {
+                display: inline-block;
+                margin-bottom: 10px;
+                margin-left: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="settings">
+        <input type="text" id="priceUnit" value="元" placeholder="价格单位">
+        <input type="text" id="measureUnit" value="kg" placeholder="重量/数量单位">
+        <div class="quick-units">
+            <button onclick="setMeasureUnit('kg')">kg</button>
+            <button onclick="setMeasureUnit('斤')">斤</button>
+            <button onclick="setMeasureUnit('g')">g</button>
+            <button onclick="setMeasureUnit('L')">L</button>
+            <button onclick="setMeasureUnit('ml')">ml</button>
+        </div>
+        <button onclick="clearAllData()" class="danger">清空数据</button>
+    </div>
+
+    <div class="add-product">
+        <input type="text" id="productName" placeholder="商品名称" required>
+        <input type="number" id="productQuantity" placeholder="数量/重量" step="0.01" required>
+        <span id="measureUnitDisplay"></span>
+        <input type="number" id="productPrice" placeholder="价格" step="0.01" required>
+        <span id="priceUnitDisplay"></span>
+        <button onclick="addProduct()">添加商品</button>
+    </div>
+
+    <div class="product-list" id="productList"></div>
+
+    <script>
+        let products = [];
+        const STORAGE_KEY = 'priceComparerData';
+        const UNITS_STORAGE_KEY = 'priceComparerUnits';
+
+        // 初始化
+        function init() {
+            loadFromStorage();
+            loadUnitsFromStorage();
+            renderProducts();
+            updateUnitDisplay();
+        }
+
+        // 从localStorage加载数据
+        function loadFromStorage() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                products = JSON.parse(savedData);
+            }
+        }
+
+        // 保存到localStorage
+        function saveToStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+        }
+
+        // 添加商品
+        function addProduct() {
+            let name = document.getElementById('productName').value;
+            const price = parseFloat(document.getElementById('productPrice').value);
+            const quantity = parseFloat(document.getElementById('productQuantity').value);
+
+            if (!price || !quantity) {
+                alert('请填写价格和数量');
+                return;
+            }
+
+            // 如果名称为空，使用时间格式
+            if (!name) {
+                const now = new Date();
+                name = `商品${now.getHours().toString().padStart(2, '0')}${
+                    now.getMinutes().toString().padStart(2, '0')}${
+                    now.getSeconds().toString().padStart(2, '0')}`;
+            }
+
+            const product = {
+                id: Date.now(),
+                name,
+                price,
+                quantity,
+                excluded: false
+            };
+
+            products.unshift(product);
+            saveToStorage();
+            renderProducts();
+
+            // 清空输入框
+            document.getElementById('productName').value = '';
+            document.getElementById('productPrice').value = '';
+            document.getElementById('productQuantity').value = '';
+        }
+
+        // 计算单位价格
+        function calculateUnitPrice(price, quantity) {
+            return price / quantity;
+        }
+
+        // 渲染商品列表
+        function renderProducts() {
+            const productList = document.getElementById('productList');
+            productList.innerHTML = '';
+
+            // 计算排名
+            const activeProducts = products.filter(p => !p.excluded);
+            activeProducts.sort((a, b) => 
+                calculateUnitPrice(a.price, a.quantity) - calculateUnitPrice(b.price, b.quantity)
+            );
+
+            products.forEach(product => {
+                const unitPrice = calculateUnitPrice(product.price, product.quantity);
+                const valuePerUnit = product.quantity / product.price; // 计算每元能买多少单位
+                const rank = product.excluded ? '-' : 
+                    (activeProducts.findIndex(p => p.id === product.id) + 1);
+                const isBestPrice = !product.excluded && rank === 1;
+
+                const card = document.createElement('div');
+                card.className = `product-card ${isBestPrice ? 'best-price' : ''} ${product.excluded ? 'excluded' : ''}`;
+                
+                card.innerHTML = `
+                    <h3>
+                        ${product.name}
+                        ${isBestPrice ? '🏆' : ''}
+                        ${rank !== '-' ? `#${rank}` : ''}
+                    </h3>
+                    <p>原价：${product.price}${document.getElementById('priceUnit').value}</p>
+                    <p>数量：${product.quantity}${document.getElementById('measureUnit').value}</p>
+                    <p>单价：${unitPrice.toFixed(2)}${document.getElementById('priceUnit').value}/${document.getElementById('measureUnit').value}</p>
+                    <p>每元能买：${valuePerUnit.toFixed(2)}${document.getElementById('measureUnit').value}/${document.getElementById('priceUnit').value}</p>
+                    <div class="actions">
+                        <button onclick="editProduct(${product.id})">重输</button>
+                        <button onclick="deleteProduct(${product.id})" class="danger">删除</button>
+                        <label>
+                            <input type="checkbox" 
+                                   ${product.excluded ? 'checked' : ''} 
+                                   onchange="toggleExclude(${product.id})">
+                            排除
+                        </label>
+                    </div>
+                `;
+
+                productList.appendChild(card);
+            });
+        }
+
+        // 修改编辑商品函数
+        function editProduct(id) {
+            const product = products.find(p => p.id === id);
+            
+            // 将商品数据填充到输入框
+            document.getElementById('productName').value = product.name;
+            document.getElementById('productPrice').value = product.price;
+            document.getElementById('productQuantity').value = product.quantity;
+            
+            // 从列表中删除该商品
+            products = products.filter(p => p.id !== id);
+            saveToStorage();
+            renderProducts();
+        }
+
+        // 删除商品
+        function deleteProduct(id) {
+            if (confirm('确定要删除这个商品吗？')) {
+                products = products.filter(p => p.id !== id);
+                saveToStorage();
+                renderProducts();
+            }
+        }
+
+        // 切换排除状态
+        function toggleExclude(id) {
+            const product = products.find(p => p.id === id);
+            product.excluded = !product.excluded;
+            saveToStorage();
+            renderProducts();
+        }
+
+        // 清空所有数据
+        function clearAllData() {
+            if (confirm('确定要清空所有商品数据吗？此操作不可撤销。')) {
+                localStorage.removeItem(STORAGE_KEY);
+                products = [];
+                renderProducts();
+            }
+        }
+
+        // 添加新函数
+        function setMeasureUnit(unit) {
+            document.getElementById('measureUnit').value = unit;
+            updateUnitDisplay();
+            saveUnitsToStorage();
+            renderProducts();
+        }
+
+        // 更新单位显示
+        function updateUnitDisplay() {
+            document.getElementById('measureUnitDisplay').textContent = document.getElementById('measureUnit').value;
+            document.getElementById('priceUnitDisplay').textContent = document.getElementById('priceUnit').value;
+        }
+
+        // 为价格单位输入框添加事件监听
+        document.getElementById('priceUnit').addEventListener('input', function() {
+            updateUnitDisplay();
+            saveUnitsToStorage();
+            renderProducts();
+        });
+
+        document.getElementById('measureUnit').addEventListener('input', function() {
+            updateUnitDisplay();
+            saveUnitsToStorage();
+            renderProducts();
+        });
+
+        // 添加新函数：保存单位设置
+        function saveUnitsToStorage() {
+            const units = {
+                priceUnit: document.getElementById('priceUnit').value,
+                measureUnit: document.getElementById('measureUnit').value
+            };
+            localStorage.setItem(UNITS_STORAGE_KEY, JSON.stringify(units));
+        }
+
+        // 添加新函数：加载单位设置
+        function loadUnitsFromStorage() {
+            const savedUnits = localStorage.getItem(UNITS_STORAGE_KEY);
+            if (savedUnits) {
+                const units = JSON.parse(savedUnits);
+                document.getElementById('priceUnit').value = units.priceUnit;
+                document.getElementById('measureUnit').value = units.measureUnit;
+            }
+        }
+
+        // 页面加载时初始化
+        window.onload = init;
+    </script>
+</body>
+</html> 
