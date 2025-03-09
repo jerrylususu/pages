@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Chat Interface</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Removed tiktoken library reference -->
+    <!-- Include marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="settings-panel">
+            <h2>Settings</h2>
+            <div class="setting-group">
+                <label for="api-endpoint">API Endpoint:</label>
+                <input type="text" id="api-endpoint" value="https://api.openai.com/v1/chat/completions">
+            </div>
+            <div class="setting-group">
+                <label for="api-key">API Key:</label>
+                <input type="password" id="api-key" placeholder="Enter your API key">
+            </div>
+            <div class="setting-group">
+                <label for="model">Model:</label>
+                <input type="text" id="model" value="gpt-3.5-turbo">
+            </div>
+            <div class="setting-group">
+                <label for="context-window">Context Window Size (tokens):</label>
+                <input type="number" id="context-window" value="4096" min="1000">
+            </div>
+            <div class="token-progress-container">
+                <label>Context Usage:</label>
+                <div class="progress-bar-container">
+                    <div id="token-progress-bar" class="progress-bar"></div>
+                </div>
+                <div id="token-count">0/4096 tokens (0%)</div>
+            </div>
+            
+            <div class="history-management">
+                <h3>Chat History</h3>
+                <div class="history-buttons">
+                    <button id="clear-history-btn" class="history-btn">Clear Chat</button>
+                    <button id="download-history-btn" class="history-btn">Download Chat</button>
+                    <label for="load-history-input" class="history-btn load-btn">Load Chat</label>
+                    <input type="file" id="load-history-input" accept=".json" style="display: none;">
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-container">
+            <div id="chat-messages" class="chat-messages"></div>
+            
+            <div class="input-container">
+                <textarea id="user-input" placeholder="Type your message here..."></textarea>
+                <div id="input-token-count" class="token-info">0 tokens</div>
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Confirm Action</div>
+            <div class="modal-message">Are you sure you want to clear the chat history? This action cannot be undone.</div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
+                <button class="modal-btn modal-btn-confirm" id="modal-confirm">Clear</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
