@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPT Tokenizer Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 16px;
+            resize: vertical;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        select, button, input {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            font-size: 16px;
+        }
+        input {
+            width: 120px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .price-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .price-input label {
+            white-space: nowrap;
+        }
+        .result {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .model-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .cost-display {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+            border-left: 4px solid #2196F3;
+        }
+        .loading {
+            display: none;
+            margin-top: 10px;
+        }
+        .error {
+            color: #e74c3c;
+            padding: 10px;
+            background-color: #fadbd8;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>GPT Tokenizer Demo</h1>
+    <div class="container">
+        <p>Enter text below to count tokens using gpt-tokenizer:</p>
+        <textarea id="input-text" placeholder="Type or paste your text here...">Hello world! This is a test of the GPT tokenizer.</textarea>
+        
+        <div class="controls">
+            <select id="encoding-type">
+                <option value="cl100k_base">cl100k_base (GPT-3.5-Turbo, GPT-4)</option>
+                <option value="o200k_base">o200k_base (GPT-4o, o1)</option>
+                <option value="p50k_base">p50k_base (GPT-3)</option>
+                <option value="p50k_edit">p50k_edit (edit models)</option>
+                <option value="r50k_base">r50k_base (Codex)</option>
+            </select>
+            <div class="price-input">
+                <label for="price-per-million">Price per 1M tokens ($):</label>
+                <input type="number" id="price-per-million" value="0.002" step="0.001" min="0">
+            </div>
+            <button id="count-tokens">Count Tokens</button>
+        </div>
+        
+        <div class="loading" id="loading">Loading tokenizer...</div>
+        <div class="error" id="error"></div>
+        <div class="result" id="result">
+            Token count will appear here.
+        </div>
+    </div>
+
+    <!-- Load the gpt-tokenizer UMD script -->
+    <script>
+        // Global variable to store the current tokenizer
+        let currentTokenizer = null;
+        let dictSizes = {
+            'cl100k_base': 100277,
+            'o200k_base': 200000,
+            'p50k_base': 50257,
+            'p50k_edit': 50257,
+            'r50k_base': 50257
+        };
+
+        // Default prices per 1M tokens for different models (just for reference)
+        let defaultPrices = {
+            'cl100k_base': 0.002, // GPT-3.5-Turbo input price
+            'o200k_base': 0.01,   // GPT-4o input price
+            'p50k_base': 0.02,    // GPT-3 price
+            'p50k_edit': 0.02,    // Edit models price
+            'r50k_base': 0.02     // Older models price
+        };
+
+        // Function to load the appropriate tokenizer
+        async function loadTokenizer(encodingType) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            
+            try {
+                // Clear any previous script
+                const oldScript = document.getElementById('tokenizer-script');
+                if (oldScript) {
+                    oldScript.remove();
+                }
+                
+                // Create and append the script tag
+                const script = document.createElement('script');
+                script.id = 'tokenizer-script';
+                script.src = `https://unpkg.com/gpt-tokenizer/dist/${encodingType}.js`;
+                script.onload = () => {
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    // Set the current tokenizer based on the encoding type
+                    const globalName = `GPTTokenizer_${encodingType}`;
+                    currentTokenizer = window[globalName];
+                    
+                    // Update the price input with a default value for this encoding
+                    document.getElementById('price-per-million').value = defaultPrices[encodingType];
+                    
+                    // Count tokens immediately after loading
+                    countTokens();
+                };
+                script.onerror = (error) => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').textContent = `Failed to load tokenizer: ${error}`;
+                    document.getElementById('error').style.display = 'block';
+                };
+                
+                document.head.appendChild(script);
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').textContent = `Error: ${error.message}`;
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        // Function to count tokens
+        function countTokens() {
+            if (!currentTokenizer) {
+                return;
+            }
+            
+            const text = document.getElementById('input-text').value;
+            const encodingType = document.getElementById('encoding-type').value;
+            const pricePerMillion = parseFloat(document.getElementById('price-per-million').value);
+            const resultElement = document.getElementById('result');
+            
+            try {
+                // Encode the text
+                const tokens = currentTokenizer.encode(text);
+                const tokenCount = tokens.length;
+                
+                // Calculate cost
+                const cost = (tokenCount / 1000000) * pricePerMillion;
+                
+                // Format cost with appropriate precision
+                let formattedCost;
+                if (cost < 0.01) {
+                    formattedCost = cost.toFixed(6);
+                } else if (cost < 0.1) {
+                    formattedCost = cost.toFixed(4);
+                } else {
+                    formattedCost = cost.toFixed(2);
+                }
+                
+                // Display the results
+                resultElement.innerHTML = `
+                    <p><strong>Encoding:</strong> ${encodingType}</p>
+                    <p><strong>Dictionary Size:</strong> ${dictSizes[encodingType].toLocaleString()} tokens</p>
+                    <p><strong>Text:</strong> "${text.length > 50 ? text.substring(0, 50) + '...' : text}"</p>
+                    <p><strong>Token count:</strong> ${tokenCount.toLocaleString()}</p>
+                    <div class="cost-display">
+                        <p><strong>Estimated cost:</strong> $${formattedCost} (at $${pricePerMillion} per 1M tokens)</p>
+                    </div>
+                    <div class="model-info">
+                        <p><strong>Compatible Models:</strong></p>
+                        <ul>
+                            ${getCompatibleModels(encodingType).map(model => `<li>${model}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            } catch (error) {
+                resultElement.innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        // Helper function to get compatible models for an encoding
+        function getCompatibleModels(encodingType) {
+            switch (encodingType) {
+                case 'cl100k_base':
+                    return ['GPT-3.5-Turbo', 'GPT-4'];
+                case 'o200k_base':
+                    return ['GPT-4o', 'o1'];
+                case 'p50k_base':
+                    return ['text-davinci-003', 'text-davinci-002'];
+                case 'p50k_edit':
+                    return ['text-davinci-edit-001', 'code-davinci-edit-001'];
+                case 'r50k_base':
+                    return ['text-davinci-001', 'Codex models'];
+                default:
+                    return [];
+            }
+        }
+
+        // Add event listeners
+        document.getElementById('count-tokens').addEventListener('click', countTokens);
+        document.getElementById('encoding-type').addEventListener('change', () => {
+            const encodingType = document.getElementById('encoding-type').value;
+            loadTokenizer(encodingType);
+        });
+        document.getElementById('input-text').addEventListener('input', countTokens);
+        document.getElementById('price-per-million').addEventListener('input', countTokens);
+        
+        // Load the default tokenizer on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const encodingType = document.getElementById('encoding-type').value;
+            loadTokenizer(encodingType);
+        });
+    </script>
+</body>
+</html>

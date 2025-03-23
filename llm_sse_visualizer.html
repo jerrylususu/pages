@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Event Visualizer</title>
+    <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+    <style>
+        :root {
+            --border-radius: 5px;
+            --box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        main {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        
+        .input-section {
+            width: 100%;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            border: 1px solid #ccc;
+            margin-bottom: 1rem;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        button {
+            padding: 0.5rem 1.5rem;
+            cursor: pointer;
+        }
+        
+        .output-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        
+        @media (min-width: 768px) {
+            .output-section {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .token-usage-container {
+                grid-column: 1 / -1;
+            }
+        }
+        
+        .output-box {
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+        }
+        
+        .output-box h3 {
+            margin: 0;
+            padding: 1rem;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .thinking, .response {
+            white-space: pre-wrap;
+            padding: 1rem;
+            min-height: 150px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 0;
+        }
+        
+        .thinking {
+            background-color: #f8f9fa;
+        }
+        
+        .response {
+            background-color: #f0f8ff;
+        }
+        
+        .token-usage {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+            background-color: #f5f5f5;
+            font-family: monospace;
+        }
+        
+        .token-item {
+            background-color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+        
+        .status {
+            grid-column: 1 / -1;
+            padding: 0.5rem 1rem;
+            text-align: center;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SSE Event Visualizer</h1>
+        <p>Paste SSE events data in the text area and click "Visualize" to see the thinking process and response</p>
+    </header>
+    
+    <main>
+        <section class="input-section">
+            <textarea id="sseData" placeholder="Paste SSE events data here..."></textarea>
+            <div class="button-group">
+                <button id="visualizeBtn">Visualize</button>
+                <button id="clearBtn">Clear</button>
+            </div>
+        </section>
+        
+        <h2>Results</h2>
+        
+        <section class="output-section">
+            <div class="output-box">
+                <h3>Thinking Process</h3>
+                <div id="thinking" class="thinking">No thinking process to display yet</div>
+            </div>
+            
+            <div class="output-box">
+                <h3>Full Response</h3>
+                <div id="response" class="response">No response to display yet</div>
+            </div>
+            
+            <div class="output-box token-usage-container">
+                <h3>Token Usage</h3>
+                <div id="tokenUsage" class="token-usage">
+                    <div class="token-item">No token usage to display yet</div>
+                </div>
+            </div>
+            
+            <div id="status" class="status"></div>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sseDataTextarea = document.getElementById('sseData');
+            const visualizeBtn = document.getElementById('visualizeBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const thinkingDiv = document.getElementById('thinking');
+            const responseDiv = document.getElementById('response');
+            const tokenUsageDiv = document.getElementById('tokenUsage');
+            const statusDiv = document.getElementById('status');
+
+            visualizeBtn.addEventListener('click', visualizeSseData);
+            clearBtn.addEventListener('click', clearAll);
+
+            function visualizeSseData() {
+                const sseText = sseDataTextarea.value.trim();
+                if (!sseText) {
+                    updateStatus('No data provided.');
+                    return;
+                }
+
+                try {
+                    const lines = sseText.split('\n').filter(line => line.trim());
+                    let thinking = [];
+                    let response = [];
+                    let finalTokenUsage = null;
+                    
+                    // For tracking think tag content
+                    let inThinkTag = false;
+                    let currentThinkContent = '';
+                    
+                    lines.forEach(line => {
+                        if (!line.startsWith('data:')) return;
+                        
+                        // Skip [DONE] line
+                        if (line.includes('data: [DONE]')) return;
+                        
+                        // Extract the JSON payload
+                        let jsonStr = line.substring(5).trim();
+                        let data;
+                        
+                        try {
+                            data = JSON.parse(jsonStr);
+                        } catch (e) {
+                            console.error('Error parsing JSON:', e);
+                            return;
+                        }
+                        
+                        if (!data.choices || !data.choices[0]) return;
+                        
+                        const delta = data.choices[0].delta;
+                        
+                        // Handle token usage
+                        if (data.usage) {
+                            finalTokenUsage = data.usage;
+                        }
+                        
+                        // Handle reasoning_content (from reasoning_context.log)
+                        if (delta && delta.reasoning_content !== undefined && delta.reasoning_content !== null) {
+                            thinking.push(delta.reasoning_content);
+                        }
+                        
+                        // Handle think tags (from think_tag.log)
+                        if (delta && delta.content !== undefined && delta.content !== null) {
+                            if (delta.content === '<think>') {
+                                inThinkTag = true;
+                                currentThinkContent = '';
+                            } else if (delta.content === '</think>') {
+                                inThinkTag = false;
+                                thinking.push(currentThinkContent);
+                            } else if (inThinkTag) {
+                                currentThinkContent += delta.content;
+                            } else {
+                                // Regular content
+                                response.push(delta.content);
+                            }
+                        }
+                    });
+                    
+                    // Update the UI
+                    thinkingDiv.textContent = thinking.join('');
+                    responseDiv.textContent = response.join('');
+                    
+                    if (finalTokenUsage) {
+                        tokenUsageDiv.innerHTML = `
+                            <div class="token-item">
+                                <strong>Prompt Tokens:</strong> ${finalTokenUsage.prompt_tokens}
+                            </div>
+                            <div class="token-item">
+                                <strong>Completion Tokens:</strong> ${finalTokenUsage.completion_tokens}
+                            </div>
+                            <div class="token-item">
+                                <strong>Total Tokens:</strong> ${finalTokenUsage.total_tokens}
+                            </div>
+                        `;
+                    } else {
+                        tokenUsageDiv.innerHTML = '<div class="token-item">No token usage information found</div>';
+                    }
+                    
+                    updateStatus('Visualization complete!');
+                    
+                } catch (error) {
+                    console.error('Error processing SSE data:', error);
+                    updateStatus(`Error: ${error.message}`);
+                }
+            }
+            
+            function clearAll() {
+                sseDataTextarea.value = '';
+                thinkingDiv.textContent = 'No thinking process to display yet';
+                responseDiv.textContent = 'No response to display yet';
+                tokenUsageDiv.innerHTML = '<div class="token-item">No token usage to display yet</div>';
+                statusDiv.textContent = '';
+            }
+            
+            function updateStatus(message) {
+                statusDiv.textContent = message;
+            }
+        });
+    </script>
+</body>
+</html>
