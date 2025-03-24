@@ -227,10 +227,10 @@
                         
                         // Handle think tags (from think_tag.log)
                         if (delta && delta.content !== undefined && delta.content !== null) {
-                            if (delta.content === '<think>') {
+                            if (delta.content.includes('<think>')) {
                                 inThinkTag = true;
                                 currentThinkContent = '';
-                            } else if (delta.content === '</think>') {
+                            } else if (delta.content.includes('</think>')) {
                                 inThinkTag = false;
                                 thinking.push(currentThinkContent);
                             } else if (inThinkTag) {
