@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRT 字幕分组工具 (纯JS)</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f0f2f5; color: #333; }
+        .container { max-width: 800px; margin: 20px auto; background-color: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
+        textarea { width: 100%; min-height: 150px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; padding: 10px; box-sizing: border-box; font-size: 14px; }
+        textarea:focus { border-color: #007bff; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+        .output-container { margin-top: 20px; }
+        .output { white-space: pre-wrap; background-color: #f8f9fa; padding: 15px; border: 1px solid #eee; border-radius: 4px; font-size: 14px; max-height: 400px; overflow-y: auto;}
+        .drop-area {
+            border: 2px dashed #007bff;
+            border-radius: 5px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+            background-color: #e9ecef;
+            color: #007bff;
+            transition: background-color 0.2s ease;
+        }
+        .drop-area p { margin: 0; font-size: 16px; }
+        .drop-area.dragover {
+            background-color: #cce5ff;
+        }
+        .controls { display: flex; gap: 15px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
+        .controls label { font-weight: bold; }
+        .controls input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 80px;
+            font-size: 14px;
+        }
+        .buttons-row { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            background-color: #007bff;
+            color: white;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        button:disabled {
+            background-color: #c0c0c0;
+            cursor: not-allowed;
+        }
+        .copy-status { color: green; margin: 0; font-size: 14px; }
+        .stats { font-size:0.8em; font-weight:normal; margin-left:10px; color: #555; }
+        h2 { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;}
+        h2 .title-text { color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SRT 字幕分组工具</h1>
+
+        <div class="controls">
+            <label for="timeLength">分组时长 (秒):</label>
+            <input type="number" id="timeLength" value="30" min="1">
+        </div>
+
+        <div id="dropArea" class="drop-area">
+            <p>拖拽 SRT 文件到此处，或点击选择文件，或直接粘贴内容到下方文本框</p>
+            <input type="file" id="fileInput" accept=".srt" style="display: none;">
+        </div>
+
+        <div class="buttons-row">
+            <button id="processButton">处理字幕</button>
+            <button id="copyButton" disabled>复制到剪贴板</button>
+            <p id="copyStatus" class="copy-status" style="display: none;">已复制!</p>
+        </div>
+
+        <textarea id="srtInput" placeholder="在此处粘贴 SRT 内容..."></textarea>
+
+        <div id="outputContainer" class="output-container" style="display: none;">
+            <h2>
+                <span class="title-text">处理结果:</span>
+                <span id="statsText" class="stats"></span>
+            </h2>
+            <pre id="groupedOutput" class="output"></pre>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const srtInputElement = document.getElementById('srtInput');
+            const timeLengthElement = document.getElementById('timeLength');
+            const processButton = document.getElementById('processButton');
+            const copyButton = document.getElementById('copyButton');
+            const groupedOutputElement = document.getElementById('groupedOutput');
+            const outputContainer = document.getElementById('outputContainer');
+            const fileInputElement = document.getElementById('fileInput');
+            const dropArea = document.getElementById('dropArea');
+            const copyStatusElement = document.getElementById('copyStatus');
+            const statsTextElement = document.getElementById('statsText');
+
+            function updateButtonStates() {
+                const srtText = srtInputElement.value.trim();
+                const timeLength = parseInt(timeLengthElement.value, 10);
+                processButton.disabled = !srtText || timeLength <= 0;
+                copyButton.disabled = !groupedOutputElement.textContent.trim();
+            }
+
+            srtInputElement.addEventListener('input', updateButtonStates);
+            timeLengthElement.addEventListener('input', updateButtonStates);
+            
+            // Initial state update
+            updateButtonStates();
+
+
+            function parseSrtTimestamp(ts) {
+                const [time, ms] = ts.split(',');
+                const [h, m, s] = time.split(':').map(Number);
+                return h * 3600 + m * 60 + s + parseFloat(ms) / 1000;
+            }
+
+            function formatTimestamp(totalSeconds) {
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = Math.floor(totalSeconds % 60);
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+
+            function processSrt() {
+                const srtText = srtInputElement.value.trim();
+                const timeLengthInSeconds = parseInt(timeLengthElement.value, 10);
+
+                if (!srtText || timeLengthInSeconds <= 0) {
+                    groupedOutputElement.textContent = '';
+                    outputContainer.style.display = 'none';
+                    statsTextElement.textContent = '';
+                    updateButtonStates();
+                    return;
+                }
+
+                const lines = srtText.split(/\r?\n/);
+                const subtitles = [];
+                let i = 0;
+                while (i < lines.length) {
+                    if (lines[i].match(/^\d+$/)) { 
+                        i++;
+                        if (i < lines.length && lines[i].includes('-->')) {
+                            const [startTimeStr, endTimeStr] = lines[i].split(' --> ');
+                            const startTime = parseSrtTimestamp(startTimeStr);
+                            const endTime = parseSrtTimestamp(endTimeStr);
+                            i++;
+                            let text = '';
+                            while (i < lines.length && lines[i].trim() !== '') {
+                                text += lines[i] + ' ';
+                                i++;
+                            }
+                            if (!isNaN(startTime) && !isNaN(endTime)) {
+                                subtitles.push({ startTime, endTime, text: text.trim() });
+                            } else {
+                                console.warn(`Skipping invalid subtitle entry near: ${startTimeStr}`);
+                            }
+                        }
+                    }
+                    i++;
+                }
+
+                if (subtitles.length === 0) {
+                    groupedOutputElement.textContent = "无法解析SRT内容或内容为空。";
+                    outputContainer.style.display = 'block';
+                    statsTextElement.textContent = '';
+                    updateButtonStates();
+                    return;
+                }
+                
+                subtitles.sort((a, b) => a.startTime - b.startTime);
+
+                let output = '';
+                let currentGroupStartTime = -1; // Initialize to a value that ensures the first subtitle starts a new group
+                let groupContent = '';
+                const groupingInterval = timeLengthInSeconds;
+
+                for (const sub of subtitles) {
+                    const subStartInGroupBoundary = Math.floor(sub.startTime / groupingInterval) * groupingInterval;
+
+                    if (currentGroupStartTime === -1 || subStartInGroupBoundary >= currentGroupStartTime + groupingInterval) {
+                        if (groupContent) {
+                            output += `[${formatTimestamp(currentGroupStartTime)}] ${groupContent.trim()}\n\n`;
+                        }
+                        currentGroupStartTime = subStartInGroupBoundary;
+                        groupContent = sub.text;
+                    } else { // Subtitle falls within the current group or is adjacent
+                         groupContent += (groupContent ? ' ' : '') + sub.text;
+                    }
+                }
+                
+                if (groupContent) { // Add the last group
+                    output += `[${formatTimestamp(currentGroupStartTime)}] ${groupContent.trim()}\n`;
+                }
+
+                groupedOutputElement.textContent = output.trim();
+                outputContainer.style.display = output.trim() ? 'block' : 'none';
+                
+                if (output.trim()) {
+                    const wordCount = output.trim().split(/\s+/).filter(Boolean).length;
+                    const charCount = output.trim().length;
+                    statsTextElement.textContent = `(字数: ${wordCount} | 字符数: ${charCount})`;
+                } else {
+                    statsTextElement.textContent = '';
+                }
+                copyStatusElement.style.display = 'none';
+                updateButtonStates();
+            }
+
+            function handleFile(file) {
+                if (file && file.name.endsWith('.srt')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        srtInputElement.value = e.target.result;
+                        processSrt();
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert("请拖拽或选择有效的 .srt 文件。");
+                }
+            }
+
+            dropArea.addEventListener('click', () => fileInputElement.click());
+            fileInputElement.addEventListener('change', (event) => {
+                if (event.target.files.length > 0) {
+                    handleFile(event.target.files[0]);
+                }
+            });
+
+            dropArea.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                dropArea.classList.add('dragover');
+            });
+
+            dropArea.addEventListener('dragleave', (event) => {
+                event.preventDefault();
+                dropArea.classList.remove('dragover');
+            });
+
+            dropArea.addEventListener('drop', (event) => {
+                event.preventDefault();
+                dropArea.classList.remove('dragover');
+                if (event.dataTransfer.files.length > 0) {
+                    handleFile(event.dataTransfer.files[0]);
+                }
+            });
+            
+            srtInputElement.addEventListener('paste', (event) => {
+                // Allow default paste behavior, then process
+                setTimeout(processSrt, 0);
+            });
+
+
+            processButton.addEventListener('click', processSrt);
+
+            copyButton.addEventListener('click', async () => {
+                if (!groupedOutputElement.textContent.trim()) return;
+                try {
+                    await navigator.clipboard.writeText(groupedOutputElement.textContent);
+                    copyStatusElement.textContent = '已复制!';
+                    copyStatusElement.style.display = 'block';
+                    setTimeout(() => {
+                        copyStatusElement.style.display = 'none';
+                    }, 2000);
+                } catch (err) {
+                    console.error('无法复制文本: ', err);
+                    copyStatusElement.textContent = '复制失败!';
+                    copyStatusElement.style.color = 'red';
+                    copyStatusElement.style.display = 'block';
+                     setTimeout(() => {
+                        copyStatusElement.style.display = 'none';
+                        copyStatusElement.style.color = 'green'; // Reset color
+                    }, 2000);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

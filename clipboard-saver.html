@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剪贴板暂存应用</title>
+    <style>
+        :root {
+            --body-bg: #f0f2f5;
+            --text-primary: #333;
+            --text-secondary: #5f6368;
+            --container-bg: #fff;
+            --container-shadow: rgba(0,0,0,0.1);
+            --item-card-bg: #f9f9f9;
+            --item-card-shadow: rgba(0,0,0,0.05);
+            --item-card-note-bg: #e8f0fe; /* Light blue, might need dark equivalent */
+            --item-card-note-text: #333; /* Added for note text */
+            --pre-bg: #fff;
+            --accent-color: #1a73e8;
+            --accent-color-hover: #1765cc;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --success-border: #c3e6cb;
+            --error-bg: #f8d7da;
+            --error-text: #721c24;
+            --error-border: #f5c6cb;
+            --button-export-bg: #34a853;
+            --button-export-hover-bg: #2e934a;
+            --button-clear-bg: #ea4335;
+            --button-clear-hover-bg: #d93025;
+            --button-delete-bg: #ff4d4f; /* Ant Design red for delete button */
+            --button-delete-hover-bg: #d9363e;
+            --border-color-input: #dadce0;
+            --border-color-divider: #e0e0e0;
+            --border-color-pre: #ddd;
+            --button-text-color: white;
+            --button-shadow: rgba(0,0,0,0.1);
+        }
+
+        /* Dark Theme Variables */
+        body.dark-mode {
+            --body-bg: #1a1a1a; /* Slightly less harsh black */
+            --text-primary: #e2e2e2;
+            --text-secondary: #b0b0b0;
+            --container-bg: #2c2c2c;
+            --container-shadow: rgba(255,255,255,0.08);
+            --item-card-bg: #383838;
+            --item-card-shadow: rgba(255,255,255,0.05);
+            --item-card-note-bg: #4a4a4a;
+            --item-card-note-text: #d0d0d0;
+            --pre-bg: #333333;
+            --accent-color: #5fa8ff; /* Lighter blue for dark mode */
+            --accent-color-hover: #4a80cc;
+            --success-bg: #1e4620; /* Dark green */
+            --success-text: #a7f3d0; /* Lighter green text */
+            --success-border: #22543d;
+            --error-bg: #450a0a; /* Dark red */
+            --error-text: #fca5a5; /* Lighter red text */
+            --error-border: #5f2727;
+            /* Button colors (like save, export, clear) can remain the same if they have good contrast */
+            /* Delete button might need adjustment if its red is too harsh on dark */
+            --border-color-input: #555555;
+            --border-color-divider: #444444;
+            --border-color-pre: #4f4f4f;
+            --button-shadow: rgba(255,255,255,0.08);
+        }
+
+        /* System Preference for Dark Mode */
+        @media (prefers-color-scheme: dark) {
+            :root:not(.light-mode-forced) { /* Apply if no light mode is forced by user */
+                --body-bg: #1a1a1a;
+                --text-primary: #e2e2e2;
+                --text-secondary: #b0b0b0;
+                --container-bg: #2c2c2c;
+                --container-shadow: rgba(255,255,255,0.08);
+                --item-card-bg: #383838;
+                --item-card-shadow: rgba(255,255,255,0.05);
+                --item-card-note-bg: #4a4a4a;
+                --item-card-note-text: #d0d0d0;
+                --pre-bg: #333333;
+                --accent-color: #5fa8ff;
+                --accent-color-hover: #4a80cc;
+                --success-bg: #1e4620;
+                --success-text: #a7f3d0;
+                --success-border: #22543d;
+                --error-bg: #450a0a;
+                --error-text: #fca5a5;
+                --error-border: #5f2727;
+                --border-color-input: #555555;
+                --border-color-divider: #444444;
+                --border-color-pre: #4f4f4f;
+                --button-shadow: rgba(255,255,255,0.08);
+            }
+            /* Ensure input fields in dark mode also get dark background and light text if not already covered */
+            :root:not(.light-mode-forced) input[type="text"],
+            :root:not(.light-mode-forced) .item-card .item-content-wrapper pre {
+                background-color: var(--pre-bg); /* Or specific dark input bg */
+                color: var(--text-primary);
+                border-color: var(--border-color-input);
+            }
+             :root:not(.light-mode-forced) .item-card .item-content-wrapper pre {
+                border-color: var(--border-color-pre);
+            }
+        }
+        /* Additional class to force light mode if system is dark but user chose light */
+        body.light-mode-forced {
+            /* Resets to light theme variables explicitly */
+            --body-bg: #f0f2f5;
+            --text-primary: #333;
+            --text-secondary: #5f6368;
+            --container-bg: #fff;
+            --container-shadow: rgba(0,0,0,0.1);
+            --item-card-bg: #f9f9f9;
+            --item-card-shadow: rgba(0,0,0,0.05);
+            --item-card-note-bg: #e8f0fe;
+            --item-card-note-text: #333;
+            --pre-bg: #fff;
+            --accent-color: #1a73e8;
+            --accent-color-hover: #1765cc;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --success-border: #c3e6cb;
+            --error-bg: #f8d7da;
+            --error-text: #721c24;
+            --error-border: #f5c6cb;
+            --border-color-input: #dadce0;
+            --border-color-divider: #e0e0e0;
+            --border-color-pre: #ddd;
+            --button-shadow: rgba(0,0,0,0.1);
+        }
+        /* Ensure input fields revert correctly when light mode is forced */
+        body.light-mode-forced input[type="text"],
+        body.light-mode-forced .item-card .item-content-wrapper pre {
+            background-color: var(--container-bg); /* Light mode input bg */
+            color: var(--text-primary); /* Light mode text */
+            border-color: var(--border-color-input);
+        }
+        body.light-mode-forced .item-card .item-content-wrapper pre {
+            background-color: var(--pre-bg); /* Light mode pre bg */
+            border-color: var(--border-color-pre);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--body-bg);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: var(--container-bg);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px var(--container-shadow);
+            width: 100%;
+            max-width: 600px;
+            position: relative; /* For theme toggle positioning */
+        }
+        h1 {
+            text-align: center;
+            color: var(--accent-color);
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid var(--border-color-input);
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.2s ease-in-out;
+            background-color: var(--container-bg); /* Input background should match container */
+            color: var(--text-primary); /* Input text color */
+        }
+        input[type="text"]:focus {
+            border-color: var(--accent-color);
+            outline: none;
+        }
+        .buttons-area {
+            display: flex;
+            gap: 10px; /* Spacing between buttons */
+            flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+            margin-top: 15px;
+        }
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            flex-grow: 1; /* Allow buttons to grow and share space */
+        }
+        #saveBtn {
+            background-color: var(--accent-color);
+            color: var(--button-text-color);
+        }
+        #saveBtn:hover {
+            background-color: var(--accent-color-hover);
+            box-shadow: 0 2px 4px var(--button-shadow);
+        }
+        #exportBtn {
+            background-color: var(--button-export-bg);
+            color: var(--button-text-color);
+        }
+        #exportBtn:hover {
+            background-color: var(--button-export-hover-bg);
+            box-shadow: 0 2px 4px var(--button-shadow);
+        }
+        #clearBtn {
+            background-color: var(--button-clear-bg);
+            color: var(--button-text-color);
+        }
+        #clearBtn:hover {
+            background-color: var(--button-clear-hover-bg);
+            box-shadow: 0 2px 4px var(--button-shadow);
+        }
+        #status {
+            margin-top: 15px; /* Adjusted from 25px */
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 14px;
+            display: none; /* Initially hidden, shown by JS for temporary messages */
+            transition: opacity 0.5s ease-in-out;
+        }
+        .status-success {
+            background-color: var(--success-bg);
+            color: var(--success-text);
+            border: 1px solid var(--success-border);
+        }
+        .status-error { /* For potential future use with errors */
+            background-color: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid var(--error-border);
+        }
+
+        #itemsDisplaySection {
+            margin-top: 25px;
+            border-top: 1px solid var(--border-color-divider);
+            padding-top: 20px;
+        }
+        #itemsHeader {
+            font-size: 1.4em;
+            color: var(--text-primary);
+            margin-bottom: 15px;
+        }
+        #itemsListContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .item-card {
+            background-color: var(--item-card-bg);
+            border: 1px solid var(--border-color-divider);
+            border-radius: 6px;
+            padding: 15px;
+            box-shadow: 0 2px 4px var(--item-card-shadow);
+        }
+        .item-card .item-meta {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            display: flex; /* For aligning index/time and delete button */
+            justify-content: space-between; /* Pushes delete button to the right */
+            align-items: center;
+        }
+        .item-card .item-index {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        .item-card .item-time {
+            margin-left: 10px;
+        }
+        .item-card .item-content-wrapper {
+            margin-bottom: 10px;
+        }
+        .item-card .item-content-wrapper pre {
+            white-space: pre-wrap; /* Preserve whitespace and newlines */
+            word-wrap: break-word; /* Break long words */
+            font-family: inherit; /* Use body font */
+            font-size: 1em;
+            background-color: var(--pre-bg);
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color-pre);
+            max-height: 200px; /* Limit height and make scrollable if needed */
+            overflow-y: auto;
+            color: var(--text-primary); /* Added for pre text color */
+        }
+        .item-card .item-note-wrapper {
+            font-size: 0.9em;
+            color: var(--text-primary); /* Note text color */
+        }
+        .item-card .item-note-wrapper strong {
+            color: var(--text-secondary); /* Note strong text color */
+        }
+        .item-card .item-note-wrapper span {
+            background-color: var(--item-card-note-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--item-card-note-text); /* Text color for note span */
+        }
+        .delete-item-btn {
+            background-color: var(--button-delete-bg);
+            color: var(--button-text-color);
+            border: none;
+            padding: 4px 8px;
+            font-size: 0.8em;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            flex-grow: 0; /* Prevent button from growing */
+            flex-shrink: 0; /* Prevent button from shrinking */
+        }
+        .delete-item-btn:hover {
+            background-color: var(--button-delete-hover-bg);
+        }
+        #themeToggleBtn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 8px 12px;
+            background-color: var(--item-card-bg); /* Use a neutral-ish bg */
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color-divider);
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            z-index: 100; /* Ensure it's above other elements */
+        }
+        #themeToggleBtn:hover {
+            background-color: var(--body-bg); /* Slight change on hover */
+            border-color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button id="themeToggleBtn">切换主题</button> <!-- Theme Toggle Button -->
+        <h1>剪贴板暂存助手</h1>
+
+        <div class="control-group">
+            <label for="noteInput">可选备注 (保存时一并记录):</label>
+            <input type="text" id="noteInput" placeholder="例如：项目A的灵感...">
+        </div>
+
+        <div class="buttons-area">
+            <button id="saveBtn">保存剪贴板内容</button>
+        </div>
+        
+        <div class="buttons-area" style="margin-top: 20px;">
+            <button id="exportBtn">导出所有数据 (JSON)</button>
+            <button id="clearBtn">清除所有已存数据</button>
+        </div>
+
+        <div id="status"></div> <!-- Will be used for temporary messages -->
+
+        <div id="itemsDisplaySection" style="display: none;"> <!-- Initially hidden if no items -->
+            <h2 id="itemsHeader">暂存记录</h2>
+            <div id="itemsListContainer">
+                <!-- Saved items will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const saveBtn = document.getElementById('saveBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const noteInput = document.getElementById('noteInput');
+            const statusDiv = document.getElementById('status');
+            const itemsDisplaySection = document.getElementById('itemsDisplaySection');
+            const itemsHeader = document.getElementById('itemsHeader');
+            const itemsListContainer = document.getElementById('itemsListContainer');
+            const themeToggleBtn = document.getElementById('themeToggleBtn'); // Get theme toggle button
+
+            const STORAGE_KEY = 'clipboardAppItems_v1';
+            const THEME_STORAGE_KEY = 'themePreference_v1'; // localStorage key for theme
+
+            // Function to update toggle button text based on current theme
+            function updateThemeToggleButtonText() {
+                const isDarkMode = document.body.classList.contains('dark-mode') || 
+                                   (!localStorage.getItem(THEME_STORAGE_KEY) && window.matchMedia('(prefers-color-scheme: dark)').matches && !document.body.classList.contains('light-mode-forced'));
+                if (isDarkMode) {
+                    themeToggleBtn.textContent = '切换到浅色模式';
+                } else {
+                    themeToggleBtn.textContent = '切换到深色模式';
+                }
+            }
+
+            // Function to apply the theme based on localStorage or system preference
+            function applyThemePreference() {
+                const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+                document.body.classList.remove('dark-mode', 'light-mode-forced'); // Clear any existing forced classes
+
+                if (savedTheme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                } else if (savedTheme === 'light') {
+                    document.body.classList.add('light-mode-forced');
+                } else {
+                    // No preference saved, or 'system' (though we don't explicitly save 'system')
+                    // CSS media query (prefers-color-scheme: dark) will handle this automatically
+                    // for dark mode. If system is light, no class is needed by default.
+                    // We still might need to ensure inputs/pre tags are styled correctly if system is dark
+                    // and no user preference exists. The CSS @media query handles this.
+                }
+                updateThemeToggleButtonText();
+            }
+
+            // Event listener for the theme toggle button
+            themeToggleBtn.addEventListener('click', () => {
+                const currentSavedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+                let switchToTheme = '';
+
+                // Determine what the next theme should be
+                if (document.body.classList.contains('dark-mode')) {
+                    // Currently dark (forced), switch to light
+                    switchToTheme = 'light';
+                } else if (document.body.classList.contains('light-mode-forced')) {
+                    // Currently light (forced), switch to dark
+                    switchToTheme = 'dark';
+                } else {
+                    // No forced theme, means we are respecting system preference
+                    // So, if system is dark, user wants to switch to light (forced).
+                    // If system is light, user wants to switch to dark (forced).
+                    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        switchToTheme = 'light'; // System is dark, toggle to light
+                    } else {
+                        switchToTheme = 'dark';  // System is light, toggle to dark
+                    }
+                }
+
+                if (switchToTheme === 'dark') {
+                    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+                } else if (switchToTheme === 'light') {
+                    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+                } else {
+                    localStorage.removeItem(THEME_STORAGE_KEY); // Should not happen with current logic but good for 'system'
+                }
+                applyThemePreference(); // Re-apply based on new storage
+            });
+
+            function getSavedItems() {
+                const itemsJson = localStorage.getItem(STORAGE_KEY);
+                try {
+                    return itemsJson ? JSON.parse(itemsJson) : [];
+                } catch (e) {
+                    console.error("解析LocalStorage数据时出错:", e);
+                    displayTemporaryMessage("错误：无法加载已存数据。", false, 3000);
+                    return [];
+                }
+            }
+
+            function saveItemsToStorage(items) { // Renamed from saveItems to avoid confusion
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+                } catch (e) {
+                    console.error("保存数据到LocalStorage时出错:", e);
+                    displayTemporaryMessage("错误：无法保存数据，可能是存储已满。", false, 3000);
+                    // alert("保存失败！LocalStorage可能已满或发生其他错误。"); // Replaced by temporary message
+                }
+            }
+
+            function displayTemporaryMessage(message, isSuccess = true, duration = 1500) {
+                statusDiv.textContent = message;
+                statusDiv.className = isSuccess ? 'status-success' : 'status-error';
+                statusDiv.style.display = 'block';
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                    statusDiv.textContent = '';
+                    statusDiv.className = '';
+                }, duration);
+            }
+
+            function renderSavedItems() {
+                const items = getSavedItems();
+                itemsListContainer.innerHTML = ''; // Clear previous items
+
+                if (items.length === 0) {
+                    itemsHeader.textContent = '暂无保存的记录';
+                    itemsDisplaySection.style.display = 'block'; // Show section even if empty, header indicates status
+                    return;
+                }
+
+                itemsDisplaySection.style.display = 'block';
+                itemsHeader.textContent = `已保存 ${items.length} 条记录`;
+                
+                items.sort((a, b) => new Date(b.time) - new Date(a.time)); // Newest first for rendering order
+
+                items.forEach((item, i) => { // i is 0 for newest, items.length-1 for oldest
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+
+                    const displayIndex = items.length - i; // Oldest is 1, newest is N
+
+                    let noteHtml = '';
+                    if (item.note) {
+                        noteHtml = `
+                            <div class="item-note-wrapper">
+                                <strong>备注:</strong> <span>${item.note}</span>
+                            </div>`;
+                    }
+
+                    card.innerHTML = `
+                        <p class="item-meta">
+                            <span>
+                                <span class="item-index">#${displayIndex}</span>
+                                <span class="item-time">${new Date(item.time).toLocaleString('zh-CN', { hour12: false })}</span>
+                            </span>
+                            <button class="delete-item-btn" data-item-id="${item.time}">删除</button>
+                        </p>
+                        <div class="item-content-wrapper">
+                            <pre>${item.content}</pre>
+                        </div>
+                        ${noteHtml}
+                    `;
+                    itemsListContainer.appendChild(card);
+                });
+
+                // Add event listeners to delete buttons after all cards are rendered
+                document.querySelectorAll('.delete-item-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const itemId = this.dataset.itemId;
+                        if (confirm('您确定要删除此条目吗？此操作无法撤销。')) {
+                            let currentItems = getSavedItems();
+                            currentItems = currentItems.filter(itm => itm.time !== itemId);
+                            saveItemsToStorage(currentItems);
+                            renderSavedItems(); // Re-render the list
+                            displayTemporaryMessage('条目已成功删除。', true, 1500);
+                        }
+                    });
+                });
+            }
+
+
+            saveBtn.addEventListener('click', async () => {
+                if (!navigator.clipboard || !navigator.clipboard.readText) {
+                    alert("您的浏览器不支持 Clipboard API (读取文本功能)，无法使用此功能。");
+                    return;
+                }
+
+                try {
+                    // Attempt to read text from clipboard
+                    const text = await navigator.clipboard.readText();
+
+                    if (!text || typeof text !== 'string' || text.trim() === '') {
+                        alert('剪贴板中没有可保存的文本内容，或内容为空。');
+                        return;
+                    }
+
+                    const note = noteInput.value.trim();
+                    const items = getSavedItems();
+                    const newItem = {
+                        time: new Date().toISOString(),
+                        content: text,
+                    };
+                    if (note) {
+                        newItem.note = note;
+                    }
+
+                    items.push(newItem);
+                    saveItemsToStorage(items); // Use renamed function
+                    displayTemporaryMessage('剪贴板内容已成功保存！', true, 1000);
+                    renderSavedItems(); // Update the list
+                    noteInput.value = ''; 
+                
+                } catch (err) {
+                    console.error('保存剪贴板内容失败:', err);
+                    let userMessage = `读取剪贴板时发生未知错误: ${err.name} - ${err.message}。请确保页面已激活并授予权限。`;
+                    if (err.name === 'NotAllowedError') {
+                        userMessage = '读取剪贴板权限被拒绝或未授予。请检查浏览器权限设置，允许本网站访问剪贴板。';
+                    } else if (err.name === 'SecurityError') {
+                         userMessage = '由于安全设置（例如，页面不是HTTPS或用户未激活窗口），无法访问剪贴板。';
+                    } else if (err.message && (err.message.toLowerCase().includes("clipboard is empty") || err.message.toLowerCase().includes("no valid data"))) {
+                        userMessage = '剪贴板中没有文本内容，或内容为空。';
+                    } else if (err.name === 'TypeError' || (err.message && err.message.toLowerCase().includes("data type not available"))) {
+                        userMessage = '剪贴板中的内容不是纯文本格式，或者当前无法读取。请确保复制的是文本。';
+                    }
+                    // alert(userMessage); // Replaced by temporary message
+                    displayTemporaryMessage(userMessage, false, 3000);
+                }
+            });
+
+            exportBtn.addEventListener('click', () => {
+                const items = getSavedItems();
+                if (items.length === 0) {
+                    // alert('没有可导出的数据。'); // Replaced
+                    displayTemporaryMessage('没有可导出的数据。', false, 2000);
+                    return;
+                }
+
+                const jsonData = JSON.stringify(items, null, 2); // Pretty print JSON
+                const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+                link.setAttribute('download', `剪贴板导出_${timestamp}.json`);
+                link.style.visibility = 'hidden'; // Hide the link
+                document.body.appendChild(link);
+                link.click(); // Simulate a click on the link
+                document.body.removeChild(link); // Clean up by removing the link
+                URL.revokeObjectURL(url); // Release the object URL
+                // statusDiv.textContent = `已导出 ${items.length} 条记录。`; // Replaced
+                displayTemporaryMessage(`已成功导出 ${items.length} 条记录。`, true, 2000);
+            });
+
+            clearBtn.addEventListener('click', () => {
+                const items = getSavedItems();
+                if (items.length === 0) {
+                    // alert('当前没有已保存的数据可以清除。'); // Replaced
+                    displayTemporaryMessage('当前没有已保存的数据可以清除。', false, 2000);
+                    return;
+                }
+                if (confirm('您确定要清除所有已保存的剪贴板数据吗？')) {
+                    if (confirm('请再次确认：此操作将永久删除所有数据，无法撤销。真的要清除吗？')) {
+                        localStorage.removeItem(STORAGE_KEY);
+                        // alert('所有已保存的数据已被成功清除。'); // Replaced
+                        displayTemporaryMessage('所有已保存的数据已被成功清除。', true, 1500);
+                        renderSavedItems(); // Update the list
+                    }
+                }
+            });
+
+            // Initial setup on page load
+            renderSavedItems(); // Render any existing items
+            applyThemePreference(); // Apply saved theme preference on load
+            
+            // Display a gentle loading message or confirmation only once after DOM is fully loaded
+            // and initial items (if any) are potentially rendered.
+            function initialLoadMessage() {
+                const initialItemsCount = getSavedItems().length;
+                 displayTemporaryMessage(initialItemsCount > 0 ? `应用已加载，找到 ${initialItemsCount} 条已存记录。` : '应用已加载，准备就绪。', true, 2000);
+            }
+            
+            if (document.readyState === 'complete') {
+                initialLoadMessage();
+            } else {
+                document.addEventListener('readystatechange', event => {
+                    if (event.target.readyState === 'complete') {
+                        initialLoadMessage();
+                    }
+                });
+            }
+
+        });
+    </script>
+</body>
+</html>
+
