@@ -359,6 +359,14 @@
             <input type="text" id="noteInput" placeholder="例如：项目A的灵感...">
         </div>
 
+        <div class="control-group">
+            <label for="showTimeToggle" style="display: inline-block; margin-right: 10px; vertical-align: middle;">显示实时诊断信息:</label>
+            <input type="checkbox" id="showTimeToggle" style="vertical-align: middle; width: auto;">
+            <span id="liveTimeDisplay" style="display: none; margin-left: 15px; font-size: 0.9em; color: var(--text-secondary); vertical-align: middle;">
+                <!-- Time info will be injected here by JS -->
+            </span>
+        </div>
+
         <div class="buttons-area">
             <button id="saveBtn">保存剪贴板内容</button>
         </div>
@@ -389,9 +397,13 @@
             const itemsHeader = document.getElementById('itemsHeader');
             const itemsListContainer = document.getElementById('itemsListContainer');
             const themeToggleBtn = document.getElementById('themeToggleBtn'); // Get theme toggle button
+            const showTimeToggle = document.getElementById('showTimeToggle');
+            const liveTimeDisplay = document.getElementById('liveTimeDisplay');
 
             const STORAGE_KEY = 'clipboardAppItems_v1';
             const THEME_STORAGE_KEY = 'themePreference_v1'; // localStorage key for theme
+            const SHOW_TIME_TOGGLE_KEY = 'showTimeTogglePreference_v1';
+            let liveTimeIntervalId = null;
 
             // Function to update toggle button text based on current theme
             function updateThemeToggleButtonText() {
@@ -454,6 +466,71 @@
                     localStorage.removeItem(THEME_STORAGE_KEY); // Should not happen with current logic but good for 'system'
                 }
                 applyThemePreference(); // Re-apply based on new storage
+            });
+
+            function formatTime(date) {
+                const h = date.getHours().toString().padStart(2, '0');
+                const m = date.getMinutes().toString().padStart(2, '0');
+                const s = date.getSeconds().toString().padStart(2, '0');
+                const ms = Math.floor(date.getMilliseconds() / 100).toString();
+                return `${h}:${m}:${s}.${ms}`;
+            }
+
+            function formatDuration(ms) {
+                if (ms < 0) ms = 0;
+                const totalSeconds = Math.floor(ms / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                const H = hours.toString().padStart(2, '0');
+                const M = minutes.toString().padStart(2, '0');
+                const S = seconds.toString().padStart(2, '0');
+                const L = Math.floor((ms % 1000) / 100).toString();
+                return `${H}:${M}:${S}.${L}`;
+            }
+
+            function updateLiveTime() {
+                const now = new Date();
+                let currentTimeFormatted = formatTime(now);
+                let timeSinceLastSaveFormatted = 'N/A';
+                
+                const items = getSavedItems();
+                if (items.length > 0) {
+                    let latestItem = items[0];
+                    for (let i = 1; i < items.length; i++) {
+                        if (new Date(items[i].time) > new Date(latestItem.time)) {
+                            latestItem = items[i];
+                        }
+                    }
+                    const lastSaveTime = new Date(latestItem.time);
+                    const diffMs = now.getTime() - lastSaveTime.getTime();
+                    timeSinceLastSaveFormatted = `${formatDuration(diffMs)} ago`;
+                }
+                liveTimeDisplay.innerHTML = `当前: ${currentTimeFormatted} | 上次保存: ${timeSinceLastSaveFormatted}`;
+            }
+
+            function applyShowTimeTogglePreference() {
+                const savedPreference = localStorage.getItem(SHOW_TIME_TOGGLE_KEY);
+                showTimeToggle.checked = savedPreference === 'true';
+
+                if (showTimeToggle.checked) {
+                    liveTimeDisplay.style.display = 'inline'; // Or 'inline-block' if sizing issues
+                    if (liveTimeIntervalId) clearInterval(liveTimeIntervalId);
+                    liveTimeIntervalId = setInterval(updateLiveTime, 100);
+                    updateLiveTime(); // Initial call to populate
+                } else {
+                    liveTimeDisplay.style.display = 'none';
+                    if (liveTimeIntervalId) {
+                        clearInterval(liveTimeIntervalId);
+                        liveTimeIntervalId = null;
+                    }
+                    liveTimeDisplay.innerHTML = ''; // Clear content when hidden
+                }
+            }
+
+            showTimeToggle.addEventListener('change', () => {
+                localStorage.setItem(SHOW_TIME_TOGGLE_KEY, showTimeToggle.checked);
+                applyShowTimeTogglePreference();
             });
 
             function getSavedItems() {
@@ -641,6 +718,7 @@
             // Initial setup on page load
             renderSavedItems(); // Render any existing items
             applyThemePreference(); // Apply saved theme preference on load
+            applyShowTimeTogglePreference(); // ADDED: Apply show time toggle preference
             
             // Display a gentle loading message or confirmation only once after DOM is fully loaded
             // and initial items (if any) are potentially rendered.
