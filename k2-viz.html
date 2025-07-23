@@ -1,0 +1,1920 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moonshot Usage Analytics</title>
+    
+    <!-- CDN Imports -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/preline@1.8.0/dist/preline.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/cdn.min.js"></script>
+    
+    <!-- Custom Configuration -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e'
+                        },
+                        gray: {
+                            50: '#fafafa',
+                            100: '#f4f4f5',
+                            200: '#e4e4e7',
+                            300: '#d4d4d8',
+                            400: '#a1a1aa',
+                            500: '#71717a',
+                            600: '#52525b',
+                            700: '#3f3f46',
+                            800: '#27272a',
+                            900: '#18181b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'scale-in': 'scaleIn 0.2s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' }
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' }
+                        },
+                        scaleIn: {
+                            '0%': { transform: 'scale(0.95)', opacity: '0' },
+                            '100%': { transform: 'scale(1)', opacity: '1' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.8);
+        }
+        
+        .dark .glass-effect {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        .hover-scale {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .hover-scale:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dark .hover-scale:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .chart-container canvas {
+            max-height: 300px !important;
+        }
+        
+        .drop-zone-animate {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .drop-zone-animate.dragover {
+            transform: scale(1.02);
+            border-color: #0ea5e9;
+            background: rgba(14, 165, 233, 0.1);
+        }
+        
+        .dark .drop-zone-animate.dragover {
+            background: rgba(14, 165, 233, 0.2);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        
+        /* Loading animation */
+        .loading-dots {
+            display: inline-block;
+            position: relative;
+            width: 80px;
+            height: 20px;
+        }
+        
+        .loading-dots div {
+            position: absolute;
+            top: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0ea5e9;
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+        
+        .loading-dots div:nth-child(1) {
+            left: 8px;
+            animation: loading-dots1 0.6s infinite;
+        }
+        
+        .loading-dots div:nth-child(2) {
+            left: 32px;
+            animation: loading-dots2 0.6s infinite;
+        }
+        
+        .loading-dots div:nth-child(3) {
+            left: 56px;
+            animation: loading-dots2 0.6s infinite;
+        }
+        
+        @keyframes loading-dots1 {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes loading-dots2 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(24px, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <!-- Theme Toggle -->
+    <button id="themeToggle" class="fixed top-4 right-4 z-50 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200 hover-scale">
+        <i class="fas fa-moon text-gray-700 dark:text-gray-300 hidden dark:block"></i>
+        <i class="fas fa-sun text-gray-700 dark:text-gray-300 dark:hidden"></i>
+    </button>
+
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
+                            Moonshot Usage Analytics
+                        </h1>
+                        <p class="text-gray-600 dark:text-gray-400 mt-1">Visualize your API usage patterns and costs</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="hidden sm:block">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">Last updated:</span>
+                            <span id="lastUpdated" class="text-sm font-medium ml-1">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+
+            <!-- File Drop Zone -->
+            <div id="dropZone" class="drop-zone-animate border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-12 text-center cursor-pointer hover:border-primary-500 dark:hover:border-primary-400 bg-white dark:bg-gray-800 hover-scale mb-8">
+                <div class="space-y-4">
+                    <div class="mx-auto h-16 w-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                        <i class="fas fa-cloud-upload-alt text-2xl text-primary-600 dark:text-primary-400"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Drop your JSON file here</h2>
+                        <p class="text-gray-600 dark:text-gray-400 mt-2">or <span class="text-primary-600 dark:text-primary-400 font-medium">click to browse</span></p>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-500">Supports result.json files from Moonshot API</p>
+                </div>
+                <input type="file" id="fileInput" accept=".json" class="hidden">
+            </div>
+
+            <!-- Instructions Section -->
+            <div id="instructionsSection" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center">
+                    <i class="fas fa-info-circle text-primary-600 dark:text-primary-400 mr-2"></i>
+                    How to Get Your Moonshot Usage Data
+                </h2>
+                
+                <div class="hs-accordion-group">
+                    <!-- Option 1: Console Script -->
+                    <div class="hs-accordion hs-accordion-active:bg-gray-50 dark:hs-accordion-active:bg-gray-800/50 rounded-lg p-4 mb-4">
+                        <button class="hs-accordion-toggle group pb-2 inline-flex items-center justify-between gap-x-3 w-full">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100">
+                                <i class="fas fa-terminal text-primary-600 dark:text-primary-400 mr-2"></i>
+                                Option 1: Browser Console Script
+                            </h3>
+                            <i class="hs-accordion-active:hidden block fas fa-chevron-down text-gray-600 dark:text-gray-400 group-hover:text-primary-600"></i>
+                            <i class="hs-accordion-active:block hidden fas fa-chevron-up text-primary-600"></i>
+                        </button>
+                        <div class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300">
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Run this script in your browser console while logged into Moonshot platform:</p>
+                            <div class="relative">
+                                <button onclick="copyScript(event, 'console')" class="absolute top-2 right-2 px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors">
+                                    <i class="fas fa-copy mr-1"></i>Copy
+                                </button>
+                                <pre id="consoleScript" class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg text-xs overflow-x-auto text-gray-800 dark:text-gray-200">// Moonshot Usage Data Fetcher - Run this in browser console
+// Make sure you're logged in to https://platform.moonshot.cn first
+
+(async function() {
+    console.log('🚀 Starting Moonshot usage data fetch...');
+    
+    // Extract organization ID from current URL or cookies
+    const extractOrgId = () => {
+        // Try to get from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('oid')) return urlParams.get('oid');
+        
+        // Try to get from localStorage or cookies
+        const localStorageKeys = Object.keys(localStorage);
+        for (let key of localStorageKeys) {
+            if (key.includes('org-')) return key.split('-')[1];
+        }
+        
+        // Common pattern from the examples
+        const selectedOrg = localStorage.getItem('selectedOrganization');
+        if (!selectedOrg) {
+            console.error('❌ No selectedOrganization found in localStorage. Please set it using localStorage.setItem("selectedOrganization", "your-org-id");');
+            alert('❌ 错误: 未找到组织ID。请在localStorage中设置"selectedOrganization"。');
+            return null; // Return null or throw an error to indicate failure
+        }
+        return selectedOrg;
+    };
+
+    const orgId = extractOrgId();
+    if (!orgId) {
+        console.error('❌ Operation cancelled due to missing organization ID.');
+        return; // Exit if orgId is not available
+    }
+    console.log(`📋 Using org ID: ${orgId}`);
+
+    // Get Bearer token from localStorage
+    const authToken = localStorage.getItem('token');
+    if (!authToken) {
+        console.error('❌ No Bearer token found in localStorage (key: "token")');
+        console.log('💡 Make sure you are logged in to https://platform.moonshot.cn');
+        return;
+    }
+    console.log('🔐 Bearer token found in localStorage');
+
+    // Get date range for last 30 days
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
+    const startTime = startDate.getTime();
+    const endTime = endDate.getTime();
+    
+    console.log(`📅 Fetching data from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+
+    const allRequests = [];
+    let page = 0;
+    let totalRecords = 0;
+
+    async function fetchPage(pageNum) {
+        const url = new URL('https://platform.moonshot.cn/api');
+        url.searchParams.set('start', startTime.toString());
+        url.searchParams.set('end', endTime.toString());
+        url.searchParams.set('page', pageNum.toString());
+        url.searchParams.set('limit', '100');
+        url.searchParams.set('desc', 'true');
+        url.searchParams.set('oid', orgId);
+        url.searchParams.set('endpoint', 'organizationRequests');
+
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+                'accept': '*/*',
+                'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'authorization': `Bearer ${authToken}`,
+                'cache-control': 'no-cache',
+                'pragma': 'no-cache',
+                'sec-fetch-dest': 'empty',
+                'sec-fetch-mode': 'cors',
+                'sec-fetch-site': 'same-origin'
+            },
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json();
+    }
+
+    try {
+        // Fetch first page to get total count
+        console.log('📡 Fetching page 1...');
+        const firstPage = await fetchPage(0);
+        
+        if (firstPage.code !== 0) {
+            throw new Error(`API Error: ${firstPage.message}`);
+        }
+
+        totalRecords = firstPage.data.total;
+        allRequests.push(...firstPage.data.requests);
+        
+        console.log(`📊 Found ${totalRecords} total records`);
+
+        // Calculate pages needed
+        const totalPages = Math.ceil(totalRecords / 100);
+        console.log(`📄 Need to fetch ${totalPages} pages total`);
+
+        // Fetch remaining pages with progress
+        for (page = 1; page < totalPages; page++) {
+            console.log(`📡 Fetching page ${page + 1}/${totalPages}...`);
+            
+            const pageData = await fetchPage(page);
+            if (pageData.code === 0 && pageData.data.requests) {
+                allRequests.push(...pageData.data.requests);
+            }
+            
+            // Small delay to be respectful
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        // Process the data
+        console.log('🔧 Processing data...');
+        const processedData = {
+            fetchedAt: new Date().toISOString(),
+            totalRequests: allRequests.length,
+            dateRange: {
+                start: startDate.toISOString(),
+                end: endDate.toISOString()
+            },
+            summary: {
+                totalTokens: allRequests.reduce((sum, req) => sum + (req.pt || 0) + (req.rt || 0), 0),
+                totalCachedInputTokens: allRequests.reduce((sum, req) => sum + (req.ct || 0), 0),
+                totalInputTokens: allRequests.reduce((sum, req) => sum + (req.pt || 0), 0),
+                totalOutputTokens: allRequests.reduce((sum, req) => sum + (req.rt || 0), 0),
+                uniqueModels: [...new Set(allRequests.map(req => req.model_id))].sort(),
+                uniqueKeys: [...new Set(allRequests.map(req => req.key))].sort()
+            },
+            requests: allRequests.map(req => ({
+                id: req.id,
+                time: req.time,
+                timestamp: new Date(req.time).getTime(),
+                cachedInputTokens: req.ct || 0,
+                inputTokens: req.pt || 0,
+                outputTokens: req.rt || 0,
+                uncachedInputTokens: (req.pt || 0) - (req.ct || 0),
+                model: req.model_id,
+                apiKey: req.key,
+                date: req.time.split('T')[0],
+                hour: new Date(req.time).getHours()
+            }))
+        };
+
+        // Download the file
+        const blob = new Blob([JSON.stringify(processedData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `moonshot-usage-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        console.log('✅ Success! File downloaded as:', a.download);
+        console.log(`📊 Summary:`);
+        console.log(`   ${processedData.totalRequests} requests`);
+        console.log(`   ${processedData.summary.totalTokens.toLocaleString()} total tokens`);
+        console.log(`   ${processedData.summary.totalCachedInputTokens.toLocaleString()} cached input tokens`);
+        console.log(`   ${processedData.summary.totalInputTokens.toLocaleString()} total input tokens`);
+        console.log(`   ${processedData.summary.totalOutputTokens.toLocaleString()} total output tokens`);
+        console.log(`   ${processedData.summary.uniqueModels.length} models: ${processedData.summary.uniqueModels.join(', ')}`);
+
+    } catch (error) {
+        console.error('❌ Error:', error.message);
+        console.log('💡 Make sure you are logged in to https://platform.moonshot.cn in this browser');
+    }
+})();
+
+// Usage Instructions:
+// 1. Go to https://platform.moonshot.cn and log in
+// 2. Open browser console (F12 → Console)
+// 3. Copy and paste this entire script
+// 4. Press Enter to run
+// 5. Your JSON file will be downloaded automatically</pre>
+                        </div>
+                    </div>
+                    
+                    </div>
+
+                    <!-- Option 2: Userscript -->
+                    <div class="hs-accordion hs-accordion-active:bg-gray-50 dark:hs-accordion-active:bg-gray-800/50 rounded-lg p-4">
+                        <button class="hs-accordion-toggle group pb-2 inline-flex items-center justify-between gap-x-3 w-full">
+                            <h3 class="font-medium text-gray-900 dark:text-gray-100">
+                                <i class="fab fa-js-square text-primary-600 dark:text-primary-400 mr-2"></i>
+                                Option 2: Userscript (Tampermonkey)
+                            </h3>
+                            <i class="hs-accordion-active:hidden block fas fa-chevron-down text-gray-600 dark:text-gray-400 group-hover:text-primary-600"></i>
+                            <i class="hs-accordion-active:block hidden fas fa-chevron-up text-primary-600"></i>
+                        </button>
+                        <div class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300">
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Install this userscript to add an "Export Usage Data" button to Moonshot platform:</p>
+                            <div class="relative">
+                                <button onclick="copyScript(event, 'userscript')" class="absolute top-2 right-2 px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors">
+                                    <i class="fas fa-copy mr-1"></i>Copy
+                                </button>
+                                <pre id="userscriptScript" class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg text-xs overflow-x-auto text-gray-800 dark:text-gray-200">
+// ==UserScript==
+// @name         Moonshot Usage Export Button
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Add a button to export Moonshot usage data as JSON with one click
+// @author       You
+// @match        https://platform.moonshot.cn/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Create the export button
+    const createExportButton = () => {
+        const button = document.createElement('button');
+        button.textContent = 'Export Usage Data';
+        button.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: background-color 0.3s;
+        `;
+        
+        button.addEventListener('mouseenter', () => {
+            button.style.background = '#0056b3';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.background = '#007bff';
+        });
+
+        button.addEventListener('click', exportUsageData);
+        
+        return button;
+    };
+
+    // Main export function
+    const exportUsageData = async () => {
+        const button = document.getElementById('moonshot-export-btn');
+        button.textContent = 'Exporting...';
+        button.disabled = true;
+        button.style.background = '#6c757d';
+
+        try {
+            console.log('🚀 Starting Moonshot usage data export...');
+            
+            // Extract organization ID from current URL or cookies
+            const extractOrgId = () => {
+                // Try to get from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('oid')) return urlParams.get('oid');
+                
+                // Try to get from localStorage or cookies
+                const localStorageKeys = Object.keys(localStorage);
+                for (let key of localStorageKeys) {
+                    if (key.includes('org-')) return key.split('-')[1];
+                }
+                
+                // Common pattern from the examples
+                const selectedOrg = localStorage.getItem('selectedOrganization');
+                if (!selectedOrg) {
+                    alert('❌ 错误: 未找到组织ID。请在localStorage中设置"selectedOrganization"。');
+                    return null; // Return null or throw an error to indicate failure
+                }
+                return selectedOrg;
+            };
+
+            const orgId = extractOrgId();
+            if (!orgId) {
+                console.error('❌ Operation cancelled due to missing organization ID.');
+                return; // Exit if orgId is not available
+            }
+            console.log(`📋 Using org ID: ${orgId}`);
+
+            // Get Bearer token from localStorage
+            const authToken = localStorage.getItem('token');
+            if (!authToken) {
+                alert('❌ No Bearer token found. Make sure you are logged in to Moonshot.');
+                return;
+            }
+            console.log('🔐 Bearer token found in localStorage');
+
+            // Get date range for last 30 days
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 30);
+            
+            const startTime = startDate.getTime();
+            const endTime = endDate.getTime();
+            
+            console.log(`📅 Fetching data from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+
+            const allRequests = [];
+            let page = 0;
+            let totalRecords = 0;
+
+            async function fetchPage(pageNum) {
+                const url = new URL('https://platform.moonshot.cn/api');
+                url.searchParams.set('start', startTime.toString());
+                url.searchParams.set('end', endTime.toString());
+                url.searchParams.set('page', pageNum.toString());
+                url.searchParams.set('limit', '100');
+                url.searchParams.set('desc', 'true');
+                url.searchParams.set('oid', orgId);
+                url.searchParams.set('endpoint', 'organizationRequests');
+
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    headers: {
+                        'accept': '*/*',
+                        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                        'authorization': `Bearer ${authToken}`,
+                        'cache-control': 'no-cache',
+                        'pragma': 'no-cache',
+                        'sec-fetch-dest': 'empty',
+                        'sec-fetch-mode': 'cors',
+                        'sec-fetch-site': 'same-origin'
+                    },
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            }
+
+            // Fetch first page to get total count
+            console.log('📡 Fetching page 1...');
+            const firstPage = await fetchPage(0);
+            
+            if (firstPage.code !== 0) {
+                throw new Error(`API Error: ${firstPage.message}`);
+            }
+
+            totalRecords = firstPage.data.total;
+            allRequests.push(...firstPage.data.requests);
+            
+            console.log(`📊 Found ${totalRecords} total records`);
+
+            // Calculate pages needed
+            const totalPages = Math.ceil(totalRecords / 100);
+            console.log(`📄 Need to fetch ${totalPages} pages total`);
+
+            // Fetch remaining pages with progress
+            for (page = 1; page < totalPages; page++) {
+                console.log(`📡 Fetching page ${page + 1}/${totalPages}...`);
+                
+                const pageData = await fetchPage(page);
+                if (pageData.code === 0 && pageData.data.requests) {
+                    allRequests.push(...pageData.data.requests);
+                }
+                
+                // Small delay to be respectful
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            // Process the data
+            console.log('🔧 Processing data...');
+            const processedData = {
+                fetchedAt: new Date().toISOString(),
+                totalRequests: allRequests.length,
+                dateRange: {
+                    start: startDate.toISOString(),
+                    end: endDate.toISOString()
+                },
+                summary: {
+                    totalTokens: allRequests.reduce((sum, req) => sum + (req.pt || 0) + (req.rt || 0), 0),
+                    totalCachedInputTokens: allRequests.reduce((sum, req) => sum + (req.ct || 0), 0),
+                    totalInputTokens: allRequests.reduce((sum, req) => sum + (req.pt || 0), 0),
+                    totalOutputTokens: allRequests.reduce((sum, req) => sum + (req.rt || 0), 0),
+                    uniqueModels: [...new Set(allRequests.map(req => req.model_id))].sort(),
+                    uniqueKeys: [...new Set(allRequests.map(req => req.key))].sort()
+                },
+                requests: allRequests.map(req => ({
+                    id: req.id,
+                    time: req.time,
+                    timestamp: new Date(req.time).getTime(),
+                    cachedInputTokens: req.ct || 0,
+                    inputTokens: req.pt || 0,
+                    outputTokens: req.rt || 0,
+                    uncachedInputTokens: (req.pt || 0) - (req.ct || 0),
+                    model: req.model_id,
+                    apiKey: req.key,
+                    date: req.time.split('T')[0],
+                    hour: new Date(req.time).getHours()
+                }))
+            };
+
+            // Download the file
+            const blob = new Blob([JSON.stringify(processedData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `moonshot-usage-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('✅ Success! File downloaded as:', a.download);
+            alert(`✅ Export complete! ${processedData.totalRequests} requests exported.`);
+
+        } catch (error) {
+            console.error('❌ Error:', error.message);
+            alert(`❌ Error: ${error.message}`);
+        } finally {
+            // Reset button
+            button.textContent = 'Export Usage Data';
+            button.disabled = false;
+            button.style.background = '#007bff';
+        }
+    };
+
+    // Add button to page
+    const addButton = () => {
+        // Remove existing button if any
+        const existingButton = document.getElementById('moonshot-export-btn');
+        if (existingButton) {
+            existingButton.remove();
+        }
+
+        const button = createExportButton();
+        button.id = 'moonshot-export-btn';
+        document.body.appendChild(button);
+    };
+
+    // Wait for page to load then add button
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', addButton);
+    } else {
+        addButton();
+    }
+
+    // Re-add button on page changes (for SPA navigation)
+    let lastUrl = location.href;
+    new MutationObserver(() => {
+        const url = location.href;
+        if (url !== lastUrl) {
+            lastUrl = url;
+            setTimeout(addButton, 1000); // Add button after navigation
+        }
+    }).observe(document, { subtree: true, childList: true });
+
+})();
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                        <i class="fas fa-lightbulb mr-1"></i>
+                        <strong>Instructions:</strong>
+                        <br>• <strong>Browser Console:</strong> Copy the script above, open Moonshot platform, press F12 → Console, paste and run
+                        <br>• <strong>Userscript:</strong> Install Tampermonkey extension, create new script, paste the code above, then visit Moonshot platform
+                    </p>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading" class="hidden text-center py-12">
+                <div class="loading-dots mx-auto">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+                <p class="text-gray-600 dark:text-gray-400 mt-4">Processing your data...</p>
+            </div>
+
+            <!-- Content -->
+            <div id="content" class="hidden space-y-8">
+                <!-- Stats Overview -->
+                <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Stats cards will be populated here -->
+                </div>
+
+                <!-- Filters -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold mb-4">Filters</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
+                            <select id="modelFilter" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                                <option value="">All Models</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date</label>
+                            <input type="date" id="startDate" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date</label>
+                            <input type="date" id="endDate" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        </div>
+                        <div class="flex items-end space-x-2">
+                            <button onclick="applyFilters()" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 hover-scale">
+                                Apply Filters
+                            </button>
+                            <button onclick="resetFilters()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-chart-line text-primary-600 dark:text-primary-400 mr-2"></i>
+                            Daily Usage (Tokens)
+                        </h3>
+                        <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-yen-sign text-green-600 dark:text-green-400 mr-2"></i>
+                            Daily Cost (¥)
+                        </h3>
+                        <div class="chart-container"><canvas id="dailyCostChart"></canvas></div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-pie-chart text-purple-600 dark:text-purple-400 mr-2"></i>
+                            Model Distribution
+                        </h3>
+                        <div class="chart-container"><canvas id="modelChart"></canvas></div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-clock text-orange-600 dark:text-orange-400 mr-2"></i>
+                            Hourly Usage Pattern
+                        </h3>
+                        <div class="chart-container"><canvas id="hourlyChart"></canvas></div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-coins text-red-600 dark:text-red-400 mr-2"></i>
+                            Hourly Cost (¥)
+                        </h3>
+                        <div class="chart-container"><canvas id="hourlyCostChart"></canvas></div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-layer-group text-blue-600 dark:text-blue-400 mr-2"></i>
+                            Token Breakdown
+                        </h3>
+                        <div class="chart-container"><canvas id="tokenBreakdownChart"></canvas></div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale lg:col-span-2">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-database text-indigo-600 dark:text-indigo-400 mr-2"></i>
+                            Cached vs Uncached Input
+                        </h3>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="chart-container"><canvas id="cachedChart"></canvas></div>
+                            <div class="space-y-4">
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Cached Tokens</span>
+                                        <span id="cachedTokens" class="text-lg font-semibold text-green-600 dark:text-green-400">-</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Uncached Tokens</span>
+                                        <span id="uncachedTokens" class="text-lg font-semibold text-orange-600 dark:text-orange-400">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale lg:col-span-2">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-chart-bar text-teal-600 dark:text-teal-400 mr-2"></i>
+                            Cost Breakdown by Type
+                        </h3>
+                        <div class="chart-container"><canvas id="costBreakdownChart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Pricing Table -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-lg font-semibold flex items-center">
+                            <i class="fas fa-tags text-primary-600 dark:text-primary-400 mr-2"></i>
+                            Pricing Information
+                        </h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-gray-700/50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Billing Unit</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Input Price (Cache Hit)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Input Price (Cache Miss)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Output Price</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Context Length</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">kimi-k2-0711-preview</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">1M tokens</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">¥1.00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">¥4.00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">¥16.00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">131,072 tokens</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Usage Details Table -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <h3 class="text-lg font-semibold flex items-center">
+                            <i class="fas fa-table text-primary-600 dark:text-primary-400 mr-2"></i>
+                            Usage Details
+                        </h3>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                            Showing <span id="showingCount">0</span> of <span id="totalCount">0</span> entries
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 dark:bg-gray-700/50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Time</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cached Input</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Uncached Input</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Output</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Tokens</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cost (¥)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                        <nav id="pagination" class="flex items-center justify-between">
+                            <!-- Pagination will be added here -->
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let allData = [];
+        let filteredData = [];
+        let charts = {};
+        let currentPage = 1;
+        const itemsPerPage = 25;
+        let chartUpdateTimeout = null;
+
+        // Initialize theme
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.className = savedTheme;
+            updateThemeToggle();
+        }
+
+        function updateThemeToggle() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const themeToggle = document.getElementById('themeToggle');
+            themeToggle.innerHTML = isDark 
+                ? '<i class="fas fa-sun text-gray-300"></i>' 
+                : '<i class="fas fa-moon text-gray-700"></i>';
+        }
+
+        // Theme toggle handler
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            const isDark = document.documentElement.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+            document.documentElement.className = newTheme;
+            localStorage.setItem('theme', newTheme);
+            updateThemeToggle();
+            
+            // Re-render charts for theme change
+            if (Object.keys(charts).length > 0) {
+                Object.values(charts).forEach(chart => {
+                    chart.options.plugins.legend.labels.color = newTheme === 'dark' ? '#e5e7eb' : '#374151';
+                    chart.options.scales.x.ticks.color = newTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                    chart.options.scales.y.ticks.color = newTheme === 'dark' ? '#9ca3af' : '#6b7280';
+                    chart.options.scales.x.grid.color = newTheme === 'dark' ? '#374151' : '#e5e7eb';
+                    chart.options.scales.y.grid.color = newTheme === 'dark' ? '#374151' : '#e5e7eb';
+                    chart.update();
+                });
+            }
+        });
+
+        // File handling
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const content = document.getElementById('content');
+        const loading = document.getElementById('loading');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.name.endsWith('.json')) {
+                alert('Please select a valid JSON file');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onloadstart = () => {
+                dropZone.classList.add('hidden');
+                loading.classList.remove('hidden');
+            };
+            
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    setTimeout(() => {
+                        loading.classList.add('hidden');
+                        content.classList.remove('hidden');
+                        loadData(data);
+                        document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+                        document.getElementById('instructionsSection').classList.add('hidden'); // Hide instructions
+                    }, 500);
+                } catch (error) {
+                    alert('Error parsing JSON file: ' + error.message);
+                    dropZone.classList.remove('hidden');
+                    loading.classList.add('hidden');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function loadData(data) {
+            if (!data.requests || !Array.isArray(data.requests)) {
+                alert('Invalid data format. Expected requests array.');
+                return;
+            }
+
+            allData = data.requests.map(item => ({
+                ...item,
+                date: new Date(item.time).toISOString().split('T')[0]
+            }));
+            filteredData = [...allData];
+            
+            populateFilters();
+            updateStats();
+            createCharts();
+            renderTable();
+            
+            // Add fade-in animation
+            content.classList.add('animate-fade-in');
+        }
+
+        function populateFilters() {
+            const models = [...new Set(allData.map(d => d.model))].sort();
+            const modelFilter = document.getElementById('modelFilter');
+            modelFilter.innerHTML = '<option value="">All Models</option>';
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelFilter.appendChild(option);
+            });
+
+            const dates = allData.map(d => new Date(d.time));
+            const minDate = new Date(Math.min(...dates));
+            const maxDate = new Date(Math.max(...dates));
+            
+            document.getElementById('startDate').value = minDate.toISOString().split('T')[0];
+            document.getElementById('endDate').value = maxDate.toISOString().split('T')[0];
+        }
+
+        function updateStats() {
+            let totalCost = 0;
+            const stats = {
+                totalRequests: filteredData.length,
+                totalTokens: 0,
+                totalCachedInputTokens: 0,
+                totalInputTokens: 0,
+                totalOutputTokens: 0,
+                uniqueModels: new Set(filteredData.map(d => d.model)).size,
+                totalCost: 0
+            };
+
+            filteredData.forEach(d => {
+                const cachedInput = d.cachedInputTokens || 0;
+                const uncachedInput = d.uncachedInputTokens || 0;
+                const output = d.outputTokens || 0;
+                const inputTokens = cachedInput + uncachedInput;
+                
+                stats.totalTokens += inputTokens + output;
+                stats.totalCachedInputTokens += cachedInput;
+                stats.totalInputTokens += inputTokens;
+                stats.totalOutputTokens += output;
+
+                if (d.model === 'kimi-k2-0711-preview') {
+                    const cachedCost = (cachedInput / 1000000) * 1.00;
+                    const uncachedCost = (uncachedInput / 1000000) * 4.00;
+                    const outputCost = (output / 1000000) * 16.00;
+                    totalCost += cachedCost + uncachedCost + outputCost;
+                }
+            });
+
+            stats.totalCost = totalCost;
+            const cachedPercentage = stats.totalInputTokens > 0 ? 
+                (stats.totalCachedInputTokens / stats.totalInputTokens) * 100 : 0;
+            const inputOutputRatio = stats.totalOutputTokens > 0 ? 
+                stats.totalInputTokens / stats.totalOutputTokens : 0;
+
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+                            <i class="fas fa-file-alt text-primary-600 dark:text-primary-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Requests</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">${stats.totalRequests.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                            <i class="fas fa-coins text-green-600 dark:text-green-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Cost</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">¥${stats.totalCost.toFixed(2)}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                            <i class="fas fa-layer-group text-blue-600 dark:text-blue-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tokens</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">${stats.totalTokens.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                            <i class="fas fa-sign-in-alt text-purple-600 dark:text-purple-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Input</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">${stats.totalInputTokens.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                            <i class="fas fa-save text-green-600 dark:text-green-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Cached Input</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">${stats.totalCachedInputTokens.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                            <i class="fas fa-sign-out-alt text-orange-600 dark:text-orange-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Output</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">${stats.totalOutputTokens.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                            <i class="fas fa-percentage text-indigo-600 dark:text-indigo-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Cache Hit Ratio</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">${cachedPercentage.toFixed(2)}%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover-scale">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                            <i class="fas fa-exchange-alt text-yellow-600 dark:text-yellow-400"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Input/Output Ratio</p>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">${inputOutputRatio.toFixed(2)}x</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Chart creation functions
+        function createCharts() {
+            // Debounce chart updates to prevent excessive re-rendering
+            if (chartUpdateTimeout) {
+                clearTimeout(chartUpdateTimeout);
+            }
+            
+            chartUpdateTimeout = setTimeout(() => {
+                // Only destroy existing charts if they exist
+                Object.values(charts).forEach(chart => {
+                    if (chart && typeof chart.destroy === 'function') {
+                        chart.destroy();
+                    }
+                });
+                
+                // Clear charts object
+                charts = {};
+
+                createDailyChart();
+                createDailyCostChart();
+                createModelChart();
+                createHourlyChart();
+                createHourlyCostChart();
+                createTokenBreakdownChart();
+                createCachedChart();
+                createCostBreakdownChart();
+            }, 100);
+        }
+
+        function createDailyChart() {
+            const dailyData = {};
+            filteredData.forEach(d => {
+                const date = d.date;
+                if (!dailyData[date]) dailyData[date] = 0;
+                dailyData[date] += ((d.cachedInputTokens || 0) + (d.uncachedInputTokens || 0)) + (d.outputTokens || 0);
+            });
+
+            const labels = Object.keys(dailyData).sort();
+            const data = labels.map(date => dailyData[date]);
+            const isDark = document.documentElement.classList.contains('dark');
+
+            const ctx = document.getElementById('dailyChart').getContext('2d');
+            charts.daily = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.map(d => new Date(d).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Tokens per Day',
+                        data: data,
+                        borderColor: '#0ea5e9',
+                        backgroundColor: isDark ? 'rgba(14, 165, 233, 0.1)' : 'rgba(14, 165, 233, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { 
+                                color: isDark ? '#9ca3af' : '#6b7280',
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        },
+                        x: { 
+                            ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    }
+                }
+            });
+        }
+
+        function createModelChart() {
+            const modelData = {};
+            filteredData.forEach(d => {
+                if (!modelData[d.model]) modelData[d.model] = 0;
+                modelData[d.model] += 1;
+            });
+
+            const labels = Object.keys(modelData);
+            const data = labels.map(model => modelData[model]);
+            const colors = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+            const isDark = document.documentElement.classList.contains('dark');
+
+            const ctx = document.getElementById('modelChart').getContext('2d');
+            charts.model = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: { 
+                                color: isDark ? '#e5e7eb' : '#374151',
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    }
+                }
+            });
+        }
+
+        function createHourlyChart() {
+            const hourlyData = new Array(24).fill(0);
+            filteredData.forEach(d => {
+                const hour = new Date(d.time).getHours();
+                hourlyData[hour] += 1;
+            });
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const ctx = document.getElementById('hourlyChart').getContext('2d');
+            charts.hourly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Requests per Hour',
+                        data: hourlyData,
+                        backgroundColor: '#0ea5e9',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        },
+                        x: { 
+                            ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                            grid: { display: false }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    }
+                }
+            });
+        }
+
+        function createDailyCostChart() {
+            const dailyCostData = {};
+            filteredData.forEach(d => {
+                const date = d.date;
+                if (!dailyCostData[date]) dailyCostData[date] = 0;
+                
+                const cachedInput = d.cachedInputTokens || 0;
+                const uncachedInput = d.uncachedInputTokens || 0;
+                const output = d.outputTokens || 0;
+                
+                let cost = 0;
+                if (d.model === 'kimi-k2-0711-preview') {
+                    const cachedCost = (cachedInput / 1000000) * 1.00;
+                    const uncachedCost = (uncachedInput / 1000000) * 4.00;
+                    const outputCost = (output / 1000000) * 16.00;
+                    cost = cachedCost + uncachedCost + outputCost;
+                }
+                
+                dailyCostData[date] += cost;
+            });
+
+            const labels = Object.keys(dailyCostData).sort();
+            const data = labels.map(date => dailyCostData[date]);
+            const isDark = document.documentElement.classList.contains('dark');
+
+            const ctx = document.getElementById('dailyCostChart').getContext('2d');
+            charts.dailyCost = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.map(d => new Date(d).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Cost per Day (¥)',
+                        data: data,
+                        borderColor: '#10b981',
+                        backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { 
+                                color: isDark ? '#9ca3af' : '#6b7280',
+                                callback: function(value) {
+                                    return '¥' + value.toFixed(2);
+                                }
+                            },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        },
+                        x: { 
+                            ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createHourlyCostChart() {
+            const hourlyCostData = new Array(24).fill(0);
+            filteredData.forEach(d => {
+                const hour = new Date(d.time).getHours();
+                
+                const cachedInput = d.cachedInputTokens || 0;
+                const uncachedInput = d.uncachedInputTokens || 0;
+                const output = d.outputTokens || 0;
+                
+                let cost = 0;
+                if (d.model === 'kimi-k2-0711-preview') {
+                    const cachedCost = (cachedInput / 1000000) * 1.00;
+                    const uncachedCost = (uncachedInput / 1000000) * 4.00;
+                    const outputCost = (output / 1000000) * 16.00;
+                    cost = cachedCost + uncachedCost + outputCost;
+                }
+                
+                hourlyCostData[hour] += cost;
+            });
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const ctx = document.getElementById('hourlyCostChart').getContext('2d');
+            charts.hourlyCost = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Cost per Hour (¥)',
+                        data: hourlyCostData,
+                        backgroundColor: '#ef4444',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { 
+                                color: isDark ? '#9ca3af' : '#6b7280',
+                                callback: function(value) {
+                                    return '¥' + value.toFixed(2);
+                                }
+                            },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        },
+                        x: { 
+                            ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTokenBreakdownChart() {
+            const tokenData = {
+                cachedInput: 0,
+                uncachedInput: 0,
+                output: 0
+            };
+
+            filteredData.forEach(d => {
+                tokenData.cachedInput += d.cachedInputTokens || 0;
+                tokenData.uncachedInput += d.uncachedInputTokens || 0;
+                tokenData.output += d.outputTokens || 0;
+            });
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const ctx = document.getElementById('tokenBreakdownChart').getContext('2d');
+            charts.tokenBreakdown = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Cached Input', 'Uncached Input', 'Output'],
+                    datasets: [{
+                        label: 'Total Tokens',
+                        data: [tokenData.cachedInput, tokenData.uncachedInput, tokenData.output],
+                        backgroundColor: ['#10b981', '#f59e0b', '#0ea5e9'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { 
+                                color: isDark ? '#9ca3af' : '#6b7280',
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        },
+                        x: { 
+                            ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createCachedChart() {
+            const cachedData = {
+                cached: 0,
+                uncached: 0
+            };
+
+            filteredData.forEach(d => {
+                cachedData.cached += d.cachedInputTokens || 0;
+                cachedData.uncached += d.uncachedInputTokens || 0;
+            });
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const ctx = document.getElementById('cachedChart').getContext('2d');
+            charts.cached = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Cached', 'Uncached'],
+                    datasets: [{
+                        data: [cachedData.cached, cachedData.uncached],
+                        backgroundColor: ['#10b981', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: { 
+                                color: isDark ? '#e5e7eb' : '#374151',
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    }
+                }
+            });
+
+            document.getElementById('cachedTokens').textContent = cachedData.cached.toLocaleString();
+            document.getElementById('uncachedTokens').textContent = cachedData.uncached.toLocaleString();
+        }
+
+        function createCostBreakdownChart() {
+            const costData = {
+                cachedInputCost: 0,
+                uncachedInputCost: 0,
+                outputCost: 0
+            };
+
+            filteredData.forEach(d => {
+                const cachedInput = d.cachedInputTokens || 0;
+                const uncachedInput = d.uncachedInputTokens || 0;
+                const output = d.outputTokens || 0;
+                
+                if (d.model === 'kimi-k2-0711-preview') {
+                    costData.cachedInputCost += (cachedInput / 1000000) * 1.00;
+                    costData.uncachedInputCost += (uncachedInput / 1000000) * 4.00;
+                    costData.outputCost += (output / 1000000) * 16.00;
+                }
+            });
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const ctx = document.getElementById('costBreakdownChart').getContext('2d');
+            charts.costBreakdown = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Cached Input', 'Uncached Input', 'Output'],
+                    datasets: [{
+                        label: 'Cost (¥)',
+                        data: [
+                            costData.cachedInputCost,
+                            costData.uncachedInputCost,
+                            costData.outputCost
+                        ],
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        borderRadius: 4,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '¥' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { 
+                                color: isDark ? '#9ca3af' : '#6b7280',
+                                callback: function(value) {
+                                    return '¥' + value.toFixed(2);
+                                }
+                            },
+                            grid: { color: isDark ? '#374151' : '#e5e7eb' }
+                        },
+                        x: { 
+                            ticks: { color: isDark ? '#9ca3af' : '#6b7280' },
+                            grid: { display: false }
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    }
+                }
+            });
+        }
+
+        function renderTable() {
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const pageData = filteredData.slice(startIndex, endIndex);
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            pageData.forEach(d => {
+                const cachedInput = d.cachedInputTokens || 0;
+                const uncachedInput = d.uncachedInputTokens || 0;
+                const output = d.outputTokens || 0;
+                const totalTokens = cachedInput + uncachedInput + output;
+                
+                let cost = 0;
+                if (d.model === 'kimi-k2-0711-preview') {
+                    const cachedCost = (cachedInput / 1000000) * 1.00;
+                    const uncachedCost = (uncachedInput / 1000000) * 4.00;
+                    const outputCost = (output / 1000000) * 16.00;
+                    cost = cachedCost + uncachedCost + outputCost;
+                }
+
+                const row = tbody.insertRow();
+                row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        ${new Date(d.time).toLocaleString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        ${d.model}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        ${cachedInput.toLocaleString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        ${uncachedInput.toLocaleString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        ${output.toLocaleString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                        ${totalTokens.toLocaleString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600 dark:text-green-400">
+                        ¥${cost.toFixed(4)}
+                    </td>
+                `;
+            });
+
+            document.getElementById('showingCount').textContent = pageData.length;
+            document.getElementById('totalCount').textContent = filteredData.length;
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            const pagination = document.getElementById('pagination');
+            
+            pagination.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+
+            // Previous button
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i> Previous';
+            prevBtn.className = `px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                currentPage === 1 
+                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                    : 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+            }`;
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderTable();
+                }
+            };
+            pagination.appendChild(prevBtn);
+
+            // Page numbers
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = `px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 mx-1 ${
+                    i === currentPage
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+                }`;
+                btn.onclick = () => {
+                    currentPage = i;
+                    renderTable();
+                };
+                pagination.appendChild(btn);
+            }
+
+            // Next button
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = 'Next <i class="fas fa-chevron-right"></i>';
+            nextBtn.className = `px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                currentPage === totalPages
+                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                    : 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+            }`;
+            nextBtn.disabled = currentPage === totalPages;
+            nextBtn.onclick = () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderTable();
+                }
+            };
+            pagination.appendChild(nextBtn);
+        }
+
+        function applyFilters() {
+            const modelFilter = document.getElementById('modelFilter').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            filteredData = allData.filter(d => {
+                const matchesModel = !modelFilter || d.model === modelFilter;
+                const date = new Date(d.time);
+                const matchesStartDate = !startDate || date >= new Date(startDate);
+                const matchesEndDate = !endDate || date <= new Date(endDate + 'T23:59:59');
+                
+                return matchesModel && matchesStartDate && matchesEndDate;
+            });
+
+            currentPage = 1;
+            updateStats();
+            createCharts();
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('modelFilter').value = '';
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            
+            filteredData = [...allData];
+            currentPage = 1;
+            updateStats();
+            createCharts();
+            renderTable();
+        }
+
+        // Copy functionality for scripts
+        function copyScript(event, type) {
+            const textToCopy = type === 'console' 
+                ? document.getElementById('consoleScript').textContent
+                : document.getElementById('userscriptScript').textContent;
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+
+            // Use Clipboard API if available and in a secure context
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    button.innerHTML = '<i class="fas fa-check mr-1"></i>Copied!';
+                    button.style.background = '#10b981';
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.style.background = '';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                    alert('Failed to copy to clipboard. Please select and copy manually.');
+                });
+            } else {
+                // Fallback for non-secure contexts (e.g., local file://)
+                const textarea = document.createElement('textarea');
+                textarea.value = textToCopy;
+                textarea.style.position = 'fixed'; // Avoid scrolling to bottom
+                textarea.style.opacity = '0'; // Hide textarea
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        button.innerHTML = '<i class="fas fa-check mr-1"></i>Copied!';
+                        button.style.background = '#10b981';
+                        setTimeout(() => {
+                            button.innerHTML = originalText;
+                            button.style.background = '';
+                        }, 2000);
+                    } else {
+                        alert('Failed to copy to clipboard. Please select and copy manually.');
+                    }
+                } catch (err) {
+                    console.error('Fallback copy failed: ', err);
+                    alert('Failed to copy to clipboard. Please select and copy manually.');
+                }
+                document.body.removeChild(textarea);
+            }
+        }
+
+        // Initialize
+        initTheme();
+
+        // Sample data for testing
+        if (location.search.includes('sample=true')) {
+            const sampleData = {
+                requests: [
+                    {id: '1', time: '2024-01-01T10:00:00Z', model: 'kimi-k2-0711-preview', cachedInputTokens: 500, uncachedInputTokens: 1000, outputTokens: 1000},
+                    {id: '2', time: '2024-01-01T11:00:00Z', model: 'kimi-k2-0711-preview', cachedInputTokens: 800, uncachedInputTokens: 1200, outputTokens: 2000},
+                    {id: '3', time: '2024-01-02T09:00:00Z', model: 'kimi-k2-0711-preview', cachedInputTokens: 300, uncachedInputTokens: 700, outputTokens: 800},
+                    {id: '4', time: '2024-01-02T14:00:00Z', model: 'kimi-k2-0711-preview', cachedInputTokens: 1200, uncachedInputTokens: 800, outputTokens: 1500}
+                ]
+            };
+            setTimeout(() => {
+                dropZone.classList.add('hidden');
+                loading.classList.add('hidden');
+                content.classList.remove('hidden');
+                loadData(sampleData);
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+            }, 100);
+        }
+    </script>
+<script src="https://cdn.jsdelivr.net/npm/preline@1.8.0/dist/preline.min.js"></script>
+</body>
+</html>
