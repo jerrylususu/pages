@@ -319,7 +319,7 @@
             background-color: var(--button-delete-bg);
             color: var(--button-text-color);
             border: none;
-            padding: 4px 8px;
+            padding: 2px 6px;
             font-size: 0.8em;
             border-radius: 4px;
             cursor: pointer;
@@ -371,6 +371,11 @@
             <button id="saveBtn">保存剪贴板内容</button>
         </div>
         
+        <div class="control-group">
+            <label for="enableDeleteToggle" style="display: inline-block; margin-right: 10px; vertical-align: middle;">启用删除按钮:</label>
+            <input type="checkbox" id="enableDeleteToggle" style="vertical-align: middle; width: auto;">
+        </div>
+
         <div class="buttons-area" style="margin-top: 20px;">
             <button id="exportBtn">导出所有数据 (JSON)</button>
             <button id="clearBtn">清除所有已存数据</button>
@@ -399,6 +404,7 @@
             const themeToggleBtn = document.getElementById('themeToggleBtn'); // Get theme toggle button
             const showTimeToggle = document.getElementById('showTimeToggle');
             const liveTimeDisplay = document.getElementById('liveTimeDisplay');
+            const enableDeleteToggle = document.getElementById('enableDeleteToggle');
 
             const STORAGE_KEY = 'clipboardAppItems_v1';
             const THEME_STORAGE_KEY = 'themePreference_v1'; // localStorage key for theme
@@ -600,7 +606,7 @@
                                 <span class="item-index">#${displayIndex}</span>
                                 <span class="item-time">${new Date(item.time).toLocaleString('zh-CN', { hour12: false })}</span>
                             </span>
-                            <button class="delete-item-btn" data-item-id="${item.time}">删除</button>
+                            <button class="delete-item-btn" data-item-id="${item.time}" style="${enableDeleteToggle.checked ? 'display: inline-block;' : 'display: none;'}">删除</button>
                         </p>
                         <div class="item-content-wrapper">
                             <pre>${item.content}</pre>
@@ -699,16 +705,19 @@
             });
 
             clearBtn.addEventListener('click', () => {
+                if (!enableDeleteToggle.checked) {
+                    displayTemporaryMessage('请先勾选“启用删除按钮”才能清除所有数据。', false, 3000);
+                    return;
+                }
+
                 const items = getSavedItems();
                 if (items.length === 0) {
-                    // alert('当前没有已保存的数据可以清除。'); // Replaced
                     displayTemporaryMessage('当前没有已保存的数据可以清除。', false, 2000);
                     return;
                 }
                 if (confirm('您确定要清除所有已保存的剪贴板数据吗？')) {
                     if (confirm('请再次确认：此操作将永久删除所有数据，无法撤销。真的要清除吗？')) {
                         localStorage.removeItem(STORAGE_KEY);
-                        // alert('所有已保存的数据已被成功清除。'); // Replaced
                         displayTemporaryMessage('所有已保存的数据已被成功清除。', true, 1500);
                         renderSavedItems(); // Update the list
                     }
@@ -719,6 +728,10 @@
             renderSavedItems(); // Render any existing items
             applyThemePreference(); // Apply saved theme preference on load
             applyShowTimeTogglePreference(); // ADDED: Apply show time toggle preference
+
+            enableDeleteToggle.addEventListener('change', () => {
+                renderSavedItems(); // Re-render to show/hide delete buttons
+            });
             
             // Display a gentle loading message or confirmation only once after DOM is fully loaded
             // and initial items (if any) are potentially rendered.
