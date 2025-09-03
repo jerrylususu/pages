@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer Visualization - Plotly</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .file-input-label:hover {
+            background: #0056b3;
+        }
+        
+        .date-filter, .time-range {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        input[type="date"] {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #218838;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-bottom: 30px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .task-list {
+            margin-top: 30px;
+        }
+        
+        .task-item {
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .task-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .task-name {
+            font-weight: 500;
+        }
+        
+        .task-time {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .task-status {
+            color: #666;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .expand-icon {
+            transition: transform 0.2s;
+            font-size: 12px;
+        }
+        
+        .expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+        
+        .task-sessions {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            display: none;
+        }
+        
+        .task-sessions.expanded {
+            display: block;
+        }
+        
+        .session-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .session-time {
+            color: #666;
+        }
+        
+        .session-duration {
+            font-weight: 500;
+            color: #007bff;
+        }
+        
+        .no-data {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Timer Visualization - Plotly</h1>
+        
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".json">
+                <label for="fileInput" class="file-input-label">Choose JSON File</label>
+            </div>
+            
+            <div class="date-filter">
+                <label for="dateFilter">Filter by date:</label>
+                <input type="date" id="dateFilter">
+                <button onclick="clearDateFilter()">Clear</button>
+            </div>
+            
+            <div class="time-range" id="timeRangeControls" style="display: none;">
+                <label>Time range:</label>
+                <input type="time" id="startTime" value="00:00">
+                <span>to</span>
+                <input type="time" id="endTime" value="23:59">
+                <button onclick="applyTimeRange()">Apply</button>
+                <button onclick="resetTimeRange()">Reset</button>
+            </div>
+        </div>
+        
+        <div id="chartWrapper" style="display: none;">
+            <div class="chart-container">
+                <div id="timerChart"></div>
+            </div>
+            
+            <div class="stats" id="statsContainer"></div>
+            
+            <div class="task-list" id="taskList"></div>
+        </div>
+        
+        <div id="noDataMessage" class="no-data">
+            Select a JSON file to visualize timer data<br>
+            <small>Using data format from <a href="https://klaster1.github.io/timer-5/" target="_blank" rel="noopener noreferrer">https://klaster1.github.io/timer-5/</a></small>
+        </div>
+    </div>
+
+    <script>
+        let timerData = null;
+        let currentTimeRange = null;
+        
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('dateFilter').addEventListener('change', handleDateChange);
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            console.log('Selected file:', file.name, file.type, file.size);
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                console.log('File content length:', e.target.result.length);
+                console.log('First 500 chars:', e.target.result.substring(0, 500));
+                
+                try {
+                    timerData = JSON.parse(e.target.result);
+                    console.log('Successfully parsed JSON:', timerData);
+                    document.getElementById('noDataMessage').style.display = 'none';
+                    document.getElementById('chartWrapper').style.display = 'block';
+                    updateVisualization();
+                } catch (error) {
+                    console.error('JSON parsing error:', error);
+                    console.error('Error message:', error.message);
+                    console.error('Error stack:', error.stack);
+                    alert('Invalid JSON file. Check console for details.');
+                }
+            };
+            reader.onerror = function(e) {
+                console.error('FileReader error:', e);
+                alert('Error reading file');
+            };
+            reader.readAsText(file);
+        }
+        
+        function handleDateChange() {
+            const dateValue = document.getElementById('dateFilter').value;
+            document.getElementById('timeRangeControls').style.display = dateValue ? 'flex' : 'none';
+            currentTimeRange = null;
+            updateVisualization();
+        }
+        
+        function updateVisualization() {
+            if (!timerData) return;
+            
+            const selectedDate = document.getElementById('dateFilter').value;
+            console.log('updateVisualization:', { selectedDate, currentTimeRange });
+            
+            const filteredData = filterDataByDate(timerData, selectedDate);
+            
+            console.log('Filtered data for visualization:', filteredData);
+            
+            updateChart(filteredData);
+            updateStats(filteredData);
+            updateTaskList(filteredData);
+        }
+        
+        function filterDataByDate(data, dateStr) {
+            if (!dateStr) return data;
+            
+            const selectedDate = new Date(dateStr);
+            selectedDate.setHours(0, 0, 0, 0);
+            const nextDate = new Date(selectedDate);
+            nextDate.setDate(nextDate.getDate() + 1);
+            
+            console.log('filterDataByDate:', {
+                dateStr,
+                selectedDate,
+                nextDate,
+                currentTimeRange
+            });
+            
+            const filtered = {
+                version: data.version,
+                value: []
+            };
+            
+            data.value.forEach(task => {
+                console.log(`Processing task: ${task.name}, sessions: ${task.sessions.length}`);
+                
+                const filteredTask = {
+                    ...task,
+                    sessions: task.sessions.filter(session => {
+                        const startTime = new Date(session[0] * 1000);
+                        
+                        // Check if within date range
+                        if (startTime < selectedDate || startTime >= nextDate) {
+                            return false;
+                        }
+                        
+                        // Check if within time range if specified
+                        if (currentTimeRange) {
+                            const [startHour, startMinute] = currentTimeRange.start.split(':').map(Number);
+                            const [endHour, endMinute] = currentTimeRange.end.split(':').map(Number);
+                            
+                            const sessionHour = startTime.getHours();
+                            const sessionMinute = startTime.getMinutes();
+                            
+                            const sessionTimeInMinutes = sessionHour * 60 + sessionMinute;
+                            const startTimeInMinutes = startHour * 60 + startMinute;
+                            const endTimeInMinutes = endHour * 60 + endMinute;
+                            
+                            console.log(`Session ${startTime}: ${sessionHour}:${sessionMinute}, range: ${currentTimeRange.start}-${currentTimeRange.end}`);
+                            
+                            return sessionTimeInMinutes >= startTimeInMinutes && sessionTimeInMinutes <= endTimeInMinutes;
+                        }
+                        
+                        return true;
+                    })
+                };
+                
+                console.log(`Task ${task.name} after filter: ${filteredTask.sessions.length} sessions`);
+                
+                if (filteredTask.sessions.length > 0) {
+                    filtered.value.push(filteredTask);
+                }
+            });
+            
+            console.log('Final filtered data:', filtered);
+            return filtered;
+        }
+        
+        function updateChart(data) {
+            console.log('updateChart called with data:', data);
+            console.log('Number of tasks in filtered data:', data.value.length);
+            
+            const traces = [];
+            const colors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+            ];
+            
+            data.value.forEach((task, index) => {
+                console.log(`Processing task for chart: ${task.name}, sessions: ${task.sessions.length}`);
+                
+                const sessionData = task.sessions.map(session => ({
+                    x: [new Date(session[0] * 1000), new Date(session[1] * 1000)],
+                    y: [index, index],
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: {
+                        color: colors[index % colors.length],
+                        width: 8
+                    },
+                    name: task.name,
+                    hoverinfo: 'text',
+                    text: `${task.name}<br>Start: ${new Date(session[0] * 1000).toLocaleString()}<br>End: ${new Date(session[1] * 1000).toLocaleString()}<br>Duration: ${((session[1] - session[0]) / 60).toFixed(1)} min`
+                }));
+                
+                traces.push(...sessionData);
+            });
+            
+            console.log('All traces:', traces);
+            
+            // Prepare layout with range selector and slider
+            const selectedDate = document.getElementById('dateFilter').value;
+            let layout = {
+                title: {
+                    text: 'Timer Sessions Timeline'
+                },
+                xaxis: {
+                    title: 'Time',
+                    type: 'date',
+                    rangeselector: {
+                        buttons: [
+                            {
+                                count: 1,
+                                label: '1h',
+                                step: 'hour',
+                                stepmode: 'backward'
+                            },
+                            {
+                                count: 6,
+                                label: '6h',
+                                step: 'hour',
+                                stepmode: 'backward'
+                            },
+                            {
+                                count: 12,
+                                label: '12h',
+                                step: 'hour',
+                                stepmode: 'backward'
+                            },
+                            {
+                                count: 1,
+                                label: '1d',
+                                step: 'day',
+                                stepmode: 'backward'
+                            },
+                            {
+                                step: 'all'
+                            }
+                        ]
+                    },
+                    rangeslider: {}
+                },
+                yaxis: {
+                    title: 'Tasks',
+                    tickvals: data.value.map((_, index) => index),
+                    ticktext: data.value.map(task => task.name),
+                    fixedrange: true
+                },
+                showlegend: false,
+                hovermode: 'closest',
+                margin: {
+                    l: 100,
+                    r: 50,
+                    t: 50,
+                    b: 100
+                }
+            };
+            
+            // Set time range based on filters
+            if (selectedDate && currentTimeRange) {
+                const date = new Date(selectedDate);
+                const [startHour, startMinute] = currentTimeRange.start.split(':');
+                const [endHour, endMinute] = currentTimeRange.end.split(':');
+                
+                const minTime = new Date(date);
+                minTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
+                
+                const maxTime = new Date(date);
+                maxTime.setHours(parseInt(endHour), parseInt(endMinute), 59, 999);
+                
+                layout.xaxis.range = [minTime, maxTime];
+            } else if (selectedDate) {
+                const date = new Date(selectedDate);
+                const minTime = new Date(date);
+                minTime.setHours(0, 0, 0, 0);
+                
+                const maxTime = new Date(date);
+                maxTime.setHours(23, 59, 59, 999);
+                
+                layout.xaxis.range = [minTime, maxTime];
+            }
+            
+            console.log('Creating new plot with traces:', traces);
+            console.log('Layout:', layout);
+            
+            Plotly.newPlot('timerChart', traces, layout, {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+            });
+        }
+        
+        function updateStats(data) {
+            const totalTasks = data.value.length;
+            const totalSessions = data.value.reduce((sum, task) => sum + task.sessions.length, 0);
+            const totalTime = data.value.reduce((sum, task) => {
+                return sum + task.sessions.reduce((taskSum, session) => taskSum + (session[1] - session[0]), 0);
+            }, 0);
+            const avgSessionTime = totalSessions > 0 ? totalTime / totalSessions / 60 : 0;
+            
+            const activeTasks = data.value.filter(task => task.state === 0).length;
+            const finishedTasks = data.value.filter(task => task.state === 1).length;
+            const droppedTasks = data.value.filter(task => task.state === 2).length;
+            
+            document.getElementById('statsContainer').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalTasks}</div>
+                    <div class="stat-label">Tasks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalSessions}</div>
+                    <div class="stat-label">Sessions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${Math.round(totalTime / 60)}m</div>
+                    <div class="stat-label">Total Time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgSessionTime.toFixed(1)}m</div>
+                    <div class="stat-label">Avg Session</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #007bff;">${activeTasks}</div>
+                    <div class="stat-label">Active</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #28a745;">${finishedTasks}</div>
+                    <div class="stat-label">Finished</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #dc3545;">${droppedTasks}</div>
+                    <div class="stat-label">Dropped</div>
+                </div>
+            `;
+        }
+        
+        function updateTaskList(data) {
+            const taskListHtml = data.value.map((task, taskIndex) => {
+                const taskTime = task.sessions.reduce((sum, session) => sum + (session[1] - session[0]), 0);
+                const taskTimeMinutes = Math.round(taskTime / 60);
+                
+                const sessionsHtml = task.sessions.map((session, sessionIndex) => {
+                    const startTime = new Date(session[0] * 1000);
+                    const endTime = new Date(session[1] * 1000);
+                    const duration = ((session[1] - session[0]) / 60).toFixed(1);
+                    
+                    return `
+                        <div class="session-item">
+                            <div class="session-time">
+                                ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}
+                            </div>
+                            <div class="session-duration">${duration} min</div>
+                        </div>
+                    `;
+                }).join('');
+                
+                return `
+                    <div class="task-item" onclick="toggleTaskSessions(${taskIndex})">
+                        <div class="task-header">
+                            <div>
+                                <div class="task-name">${task.name}</div>
+                                <div class="task-time">${task.sessions.length} sessions • ${taskTimeMinutes} minutes total</div>
+                            </div>
+                            <div class="task-status">
+                                <span class="expand-icon" id="expand-icon-${taskIndex}">▶</span>
+                                <span style="color: ${task.state === 0 ? '#007bff' : task.state === 1 ? '#28a745' : '#dc3545'}">
+                                    ${task.state === 0 ? 'Active' : task.state === 1 ? 'Finished' : 'Dropped'}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="task-sessions" id="task-sessions-${taskIndex}">
+                            ${sessionsHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('taskList').innerHTML = `
+                <h3>Tasks</h3>
+                ${taskListHtml || '<p class="no-data">No tasks found for selected date</p>'}
+            `;
+        }
+        
+        function toggleTaskSessions(taskIndex) {
+            const sessionsDiv = document.getElementById(`task-sessions-${taskIndex}`);
+            const expandIcon = document.getElementById(`expand-icon-${taskIndex}`);
+            
+            if (sessionsDiv.classList.contains('expanded')) {
+                sessionsDiv.classList.remove('expanded');
+                expandIcon.classList.remove('expanded');
+            } else {
+                sessionsDiv.classList.add('expanded');
+                expandIcon.classList.add('expanded');
+            }
+        }
+        
+        function clearDateFilter() {
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('timeRangeControls').style.display = 'none';
+            currentTimeRange = null;
+            updateVisualization();
+        }
+        
+        function applyTimeRange() {
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            console.log('applyTimeRange:', { startTime, endTime });
+            
+            if (startTime && endTime) {
+                currentTimeRange = { start: startTime, end: endTime };
+                console.log('Set currentTimeRange:', currentTimeRange);
+                updateVisualization();
+            }
+        }
+        
+        function resetTimeRange() {
+            document.getElementById('startTime').value = '00:00';
+            document.getElementById('endTime').value = '23:59';
+            currentTimeRange = null;
+            updateVisualization();
+        }
+    </script>
+</body>
+</html>
