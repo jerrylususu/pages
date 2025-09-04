@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timer Visualization - Plotly</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.1.0.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -65,13 +65,13 @@
             background: #0056b3;
         }
         
-        .date-filter, .time-range {
+        .datetime-range {
             display: flex;
             gap: 10px;
             align-items: center;
         }
         
-        input[type="date"] {
+        input[type="datetime-local"] {
             padding: 8px 12px;
             border: 1px solid #ddd;
             border-radius: 6px;
@@ -96,6 +96,16 @@
             position: relative;
             height: 500px;
             margin-bottom: 30px;
+        }
+        
+        .height-control {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .height-control input[type="range"] {
+            width: 150px;
         }
         
         .stats {
@@ -220,19 +230,19 @@
                 <label for="fileInput" class="file-input-label">Choose JSON File</label>
             </div>
             
-            <div class="date-filter">
-                <label for="dateFilter">Filter by date:</label>
-                <input type="date" id="dateFilter">
-                <button onclick="clearDateFilter()">Clear</button>
+            <div class="datetime-range">
+                <label>Datetime range:</label>
+                <input type="datetime-local" id="startDateTime">
+                <span>to</span>
+                <input type="datetime-local" id="endDateTime">
+                <button onclick="applyDateTimeRange()">Apply</button>
+                <button onclick="clearDateTimeRange()">Clear</button>
             </div>
             
-            <div class="time-range" id="timeRangeControls" style="display: none;">
-                <label>Time range:</label>
-                <input type="time" id="startTime" value="00:00">
-                <span>to</span>
-                <input type="time" id="endTime" value="23:59">
-                <button onclick="applyTimeRange()">Apply</button>
-                <button onclick="resetTimeRange()">Reset</button>
+            <div class="height-control">
+                <label for="chartHeight">Chart height:</label>
+                <input type="range" id="chartHeight" min="300" max="1200" value="500" step="50">
+                <span id="heightValue">500px</span>
             </div>
         </div>
         
@@ -248,16 +258,27 @@
         
         <div id="noDataMessage" class="no-data">
             Select a JSON file to visualize timer data<br>
-            <small>Using data format from <a href="https://klaster1.github.io/timer-5/" target="_blank" rel="noopener noreferrer">https://klaster1.github.io/timer-5/</a></small>
+            <small>Using data format from <a href="https://klaster1.github.io/timer-5/" target="_blank">https://klaster1.github.io/timer-5/</a></small>
         </div>
     </div>
 
     <script>
         let timerData = null;
-        let currentTimeRange = null;
+        let currentDateTimeRange = null;
+        
+        document.getElementById('chartHeight').addEventListener('input', function() {
+            const height = this.value;
+            document.getElementById('heightValue').textContent = height + 'px';
+            document.querySelector('.chart-container').style.height = height + 'px';
+            if (timerData) {
+                // Use Plotly's relayout to properly resize the chart
+                Plotly.relayout('timerChart', {
+                    height: parseInt(height)
+                });
+            }
+        });
         
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
-        document.getElementById('dateFilter').addEventListener('change', handleDateChange);
         
         function handleFileSelect(event) {
             const file = event.target.files[0];
@@ -273,6 +294,10 @@
                 try {
                     timerData = JSON.parse(e.target.result);
                     console.log('Successfully parsed JSON:', timerData);
+                    
+                    // Process ongoing sessions (null end times)
+                    processOngoingSessions(timerData);
+                    
                     document.getElementById('noDataMessage').style.display = 'none';
                     document.getElementById('chartWrapper').style.display = 'block';
                     updateVisualization();
@@ -290,20 +315,53 @@
             reader.readAsText(file);
         }
         
-        function handleDateChange() {
-            const dateValue = document.getElementById('dateFilter').value;
-            document.getElementById('timeRangeControls').style.display = dateValue ? 'flex' : 'none';
-            currentTimeRange = null;
+        // fix for ongoing sessions
+        // use current timestamp as session end to prevent graph breaking due to inf time span
+        function processOngoingSessions(data) {
+            const currentTimestamp = Math.floor(Date.now() / 1000);
+            let processedSessions = 0;
+            
+            data.value.forEach(task => {
+                task.sessions.forEach(session => {
+                    if (session[1] === null || session[1] === undefined) {
+                        session[1] = currentTimestamp;
+                        processedSessions++;
+                        console.log(`Processed ongoing session for task "${task.name}": set end time to ${new Date(currentTimestamp * 1000).toLocaleString()}`);
+                    }
+                });
+            });
+            
+            if (processedSessions > 0) {
+                console.log(`Processed ${processedSessions} ongoing sessions using current timestamp: ${new Date(currentTimestamp * 1000).toLocaleString()}`);
+            }
+        }
+        
+        function applyDateTimeRange() {
+            const startDateTime = document.getElementById('startDateTime').value;
+            const endDateTime = document.getElementById('endDateTime').value;
+            
+            if (startDateTime && endDateTime) {
+                currentDateTimeRange = {
+                    start: new Date(startDateTime),
+                    end: new Date(endDateTime)
+                };
+                updateVisualization();
+            }
+        }
+        
+        function clearDateTimeRange() {
+            document.getElementById('startDateTime').value = '';
+            document.getElementById('endDateTime').value = '';
+            currentDateTimeRange = null;
             updateVisualization();
         }
         
         function updateVisualization() {
             if (!timerData) return;
             
-            const selectedDate = document.getElementById('dateFilter').value;
-            console.log('updateVisualization:', { selectedDate, currentTimeRange });
+            console.log('updateVisualization:', { currentDateTimeRange });
             
-            const filteredData = filterDataByDate(timerData, selectedDate);
+            const filteredData = filterDataByDateTime(timerData, currentDateTimeRange);
             
             console.log('Filtered data for visualization:', filteredData);
             
@@ -312,20 +370,10 @@
             updateTaskList(filteredData);
         }
         
-        function filterDataByDate(data, dateStr) {
-            if (!dateStr) return data;
+        function filterDataByDateTime(data, dateTimeRange) {
+            if (!dateTimeRange) return data;
             
-            const selectedDate = new Date(dateStr);
-            selectedDate.setHours(0, 0, 0, 0);
-            const nextDate = new Date(selectedDate);
-            nextDate.setDate(nextDate.getDate() + 1);
-            
-            console.log('filterDataByDate:', {
-                dateStr,
-                selectedDate,
-                nextDate,
-                currentTimeRange
-            });
+            console.log('filterDataByDateTime:', { dateTimeRange });
             
             const filtered = {
                 version: data.version,
@@ -335,35 +383,25 @@
             data.value.forEach(task => {
                 console.log(`Processing task: ${task.name}, sessions: ${task.sessions.length}`);
                 
+                const truncatedSessions = [];
+                
+                task.sessions.forEach(session => {
+                    const sessionStart = new Date(session[0] * 1000);
+                    const sessionEnd = new Date(session[1] * 1000);
+                    
+                    // Check if session overlaps with datetime range
+                    if (sessionStart <= dateTimeRange.end && sessionEnd >= dateTimeRange.start) {
+                        // Truncate session to datetime range
+                        const truncatedStart = Math.max(sessionStart.getTime(), dateTimeRange.start.getTime()) / 1000;
+                        const truncatedEnd = Math.min(sessionEnd.getTime(), dateTimeRange.end.getTime()) / 1000;
+                        
+                        truncatedSessions.push([truncatedStart, truncatedEnd]);
+                    }
+                });
+                
                 const filteredTask = {
                     ...task,
-                    sessions: task.sessions.filter(session => {
-                        const startTime = new Date(session[0] * 1000);
-                        
-                        // Check if within date range
-                        if (startTime < selectedDate || startTime >= nextDate) {
-                            return false;
-                        }
-                        
-                        // Check if within time range if specified
-                        if (currentTimeRange) {
-                            const [startHour, startMinute] = currentTimeRange.start.split(':').map(Number);
-                            const [endHour, endMinute] = currentTimeRange.end.split(':').map(Number);
-                            
-                            const sessionHour = startTime.getHours();
-                            const sessionMinute = startTime.getMinutes();
-                            
-                            const sessionTimeInMinutes = sessionHour * 60 + sessionMinute;
-                            const startTimeInMinutes = startHour * 60 + startMinute;
-                            const endTimeInMinutes = endHour * 60 + endMinute;
-                            
-                            console.log(`Session ${startTime}: ${sessionHour}:${sessionMinute}, range: ${currentTimeRange.start}-${currentTimeRange.end}`);
-                            
-                            return sessionTimeInMinutes >= startTimeInMinutes && sessionTimeInMinutes <= endTimeInMinutes;
-                        }
-                        
-                        return true;
-                    })
+                    sessions: truncatedSessions
                 };
                 
                 console.log(`Task ${task.name} after filter: ${filteredTask.sessions.length} sessions`);
@@ -387,12 +425,41 @@
                 '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
             ];
             
+            // Add [ACTIVE] pseudo task that combines all active sessions
+            const allActiveSessions = [];
+            data.value.forEach(task => {
+                task.sessions.forEach(session => {
+                    allActiveSessions.push(session);
+                });
+            });
+            
+            // Sort sessions by start time
+            allActiveSessions.sort((a, b) => a[0] - b[0]);
+            
+            // Create [ACTIVE] pseudo task traces at position 0
+            const activeTraces = allActiveSessions.map(session => ({
+                x: [new Date(session[0] * 1000), new Date(session[1] * 1000)],
+                y: [0, 0],
+                type: 'scatter',
+                mode: 'lines',
+                line: {
+                    color: '#888888',
+                    width: 12
+                },
+                name: '[ACTIVE]',
+                hoverinfo: 'text',
+                text: `[ACTIVE]<br>Start: ${new Date(session[0] * 1000).toLocaleString()}<br>End: ${new Date(session[1] * 1000).toLocaleString()}<br>Duration: ${((session[1] - session[0]) / 60).toFixed(1)} min`
+            }));
+            
+            traces.push(...activeTraces);
+            
+            // Add regular tasks starting from position 1
             data.value.forEach((task, index) => {
                 console.log(`Processing task for chart: ${task.name}, sessions: ${task.sessions.length}`);
                 
                 const sessionData = task.sessions.map(session => ({
                     x: [new Date(session[0] * 1000), new Date(session[1] * 1000)],
-                    y: [index, index],
+                    y: [index + 1, index + 1],
                     type: 'scatter',
                     mode: 'lines',
                     line: {
@@ -410,7 +477,7 @@
             console.log('All traces:', traces);
             
             // Prepare layout with range selector and slider
-            const selectedDate = document.getElementById('dateFilter').value;
+            const chartHeight = document.getElementById('chartHeight').value;
             let layout = {
                 title: {
                     text: 'Timer Sessions Timeline'
@@ -453,8 +520,8 @@
                 },
                 yaxis: {
                     title: 'Tasks',
-                    tickvals: data.value.map((_, index) => index),
-                    ticktext: data.value.map(task => task.name),
+                    tickvals: [0, ...data.value.map((_, index) => index + 1)],
+                    ticktext: ['[ACTIVE]', ...data.value.map(task => task.name)],
                     fixedrange: true
                 },
                 showlegend: false,
@@ -467,38 +534,36 @@
                 }
             };
             
-            // Set time range based on filters
-            if (selectedDate && currentTimeRange) {
-                const date = new Date(selectedDate);
-                const [startHour, startMinute] = currentTimeRange.start.split(':');
-                const [endHour, endMinute] = currentTimeRange.end.split(':');
-                
-                const minTime = new Date(date);
-                minTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
-                
-                const maxTime = new Date(date);
-                maxTime.setHours(parseInt(endHour), parseInt(endMinute), 59, 999);
-                
-                layout.xaxis.range = [minTime, maxTime];
-            } else if (selectedDate) {
-                const date = new Date(selectedDate);
-                const minTime = new Date(date);
-                minTime.setHours(0, 0, 0, 0);
-                
-                const maxTime = new Date(date);
-                maxTime.setHours(23, 59, 59, 999);
-                
-                layout.xaxis.range = [minTime, maxTime];
+            // Set time range based on datetime range
+            if (currentDateTimeRange) {
+                layout.xaxis.range = [currentDateTimeRange.start, currentDateTimeRange.end];
             }
             
             console.log('Creating new plot with traces:', traces);
             console.log('Layout:', layout);
             
-            Plotly.newPlot('timerChart', traces, layout, {
+            const config = {
                 responsive: true,
                 displayModeBar: true,
                 modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-            });
+            };
+            
+            Plotly.newPlot('timerChart', traces, layout, config);
+        }
+        
+        function formatTime(minutes) {
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            let formatted = '';
+            
+            if (hours > 0) {
+                formatted += `${hours}h`;
+            }
+            if (mins > 0 || hours === 0) {
+                formatted += `${mins}m`;
+            }
+            
+            return `${formatted} (${minutes}min)`;
         }
         
         function updateStats(data) {
@@ -508,6 +573,7 @@
                 return sum + task.sessions.reduce((taskSum, session) => taskSum + (session[1] - session[0]), 0);
             }, 0);
             const avgSessionTime = totalSessions > 0 ? totalTime / totalSessions / 60 : 0;
+            const totalTimeMinutes = Math.round(totalTime / 60);
             
             const activeTasks = data.value.filter(task => task.state === 0).length;
             const finishedTasks = data.value.filter(task => task.state === 1).length;
@@ -523,7 +589,7 @@
                     <div class="stat-label">Sessions</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${Math.round(totalTime / 60)}m</div>
+                    <div class="stat-value">${formatTime(totalTimeMinutes)}</div>
                     <div class="stat-label">Total Time</div>
                 </div>
                 <div class="stat-card">
@@ -570,7 +636,7 @@
                         <div class="task-header">
                             <div>
                                 <div class="task-name">${task.name}</div>
-                                <div class="task-time">${task.sessions.length} sessions • ${taskTimeMinutes} minutes total</div>
+                                <div class="task-time">${task.sessions.length} sessions • ${formatTime(taskTimeMinutes)}</div>
                             </div>
                             <div class="task-status">
                                 <span class="expand-icon" id="expand-icon-${taskIndex}">▶</span>
@@ -605,30 +671,23 @@
             }
         }
         
-        function clearDateFilter() {
-            document.getElementById('dateFilter').value = '';
-            document.getElementById('timeRangeControls').style.display = 'none';
-            currentTimeRange = null;
-            updateVisualization();
-        }
-        
-        function applyTimeRange() {
-            const startTime = document.getElementById('startTime').value;
-            const endTime = document.getElementById('endTime').value;
+        function applyDateTimeRange() {
+            const startDateTime = document.getElementById('startDateTime').value;
+            const endDateTime = document.getElementById('endDateTime').value;
             
-            console.log('applyTimeRange:', { startTime, endTime });
-            
-            if (startTime && endTime) {
-                currentTimeRange = { start: startTime, end: endTime };
-                console.log('Set currentTimeRange:', currentTimeRange);
+            if (startDateTime && endDateTime) {
+                currentDateTimeRange = {
+                    start: new Date(startDateTime),
+                    end: new Date(endDateTime)
+                };
                 updateVisualization();
             }
         }
         
-        function resetTimeRange() {
-            document.getElementById('startTime').value = '00:00';
-            document.getElementById('endTime').value = '23:59';
-            currentTimeRange = null;
+        function clearDateTimeRange() {
+            document.getElementById('startDateTime').value = '';
+            document.getElementById('endDateTime').value = '';
+            currentDateTimeRange = null;
             updateVisualization();
         }
     </script>
