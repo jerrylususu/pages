@@ -12,23 +12,66 @@
             box-sizing: border-box;
         }
         
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #f8f9fa;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --shadow-color: rgba(0,0,0,0.1);
+            --button-primary: #007bff;
+            --button-primary-hover: #0056b3;
+            --button-success: #28a745;
+            --button-success-hover: #218838;
+            --button-secondary: #6c757d;
+            --button-secondary-hover: #5a6268;
+            --stat-blue: #007bff;
+            --stat-green: #28a745;
+            --stat-red: #dc3545;
+            --chart-active: #90EE90;
+            --chart-inactive: #D3D3D3;
+        }
+        
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-card: #3a3a3a;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --border-color: #4a4a4a;
+            --shadow-color: rgba(0,0,0,0.3);
+            --button-primary: #0066cc;
+            --button-primary-hover: #0052a3;
+            --button-success: #1e7e34;
+            --button-success-hover: #1a6e2d;
+            --button-secondary: #5a6268;
+            --button-secondary-hover: #4a5158;
+            --stat-blue: #4da3ff;
+            --stat-green: #5cb85c;
+            --stat-red: #ff6b6b;
+            --chart-active: #7dd87d;
+            --chart-inactive: #666666;
+        }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
+            background: var(--bg-primary);
             padding: 20px;
+            color: var(--text-primary);
         }
         
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: white;
+            background: var(--bg-secondary);
             border-radius: 12px;
             padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px var(--shadow-color);
         }
         
         h1 {
-            color: #333;
+            color: var(--text-primary);
             margin-bottom: 30px;
         }
         
@@ -54,7 +97,7 @@
         .file-input-label {
             display: inline-block;
             padding: 10px 20px;
-            background: #007bff;
+            background: var(--button-primary);
             color: white;
             border-radius: 6px;
             cursor: pointer;
@@ -62,7 +105,34 @@
         }
         
         .file-input-label:hover {
-            background: #0056b3;
+            background: var(--button-primary-hover);
+        }
+        
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .theme-toggle button {
+            padding: 8px 16px;
+            background: var(--button-secondary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .theme-toggle button:hover {
+            background: var(--button-secondary-hover);
+        }
+        
+        .theme-icon {
+            font-size: 16px;
         }
         
         .datetime-range {
@@ -73,14 +143,16 @@
         
         input[type="datetime-local"] {
             padding: 8px 12px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
             border-radius: 6px;
             font-size: 14px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
         }
         
         button {
             padding: 10px 20px;
-            background: #28a745;
+            background: var(--button-success);
             color: white;
             border: none;
             border-radius: 6px;
@@ -89,7 +161,52 @@
         }
         
         button:hover {
-            background: #218838;
+            background: var(--button-success-hover);
+        }
+        
+        .day-navigation {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .day-navigation button {
+            padding: 8px 16px;
+            background: var(--button-secondary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+        
+        .day-navigation button:hover {
+            background: var(--button-secondary-hover);
+        }
+        
+        .day-navigation button:first-child {
+            background: var(--button-primary);
+        }
+        
+        .day-navigation button:first-child:hover {
+            background: var(--button-primary-hover);
+        }
+        
+        .day-navigation button:nth-child(2) {
+            background: var(--button-success);
+        }
+        
+        .day-navigation button:nth-child(2):hover {
+            background: var(--button-success-hover);
+        }
+        
+        .day-navigation button:last-child {
+            background: var(--button-primary);
+        }
+        
+        .day-navigation button:last-child:hover {
+            background: var(--button-primary-hover);
         }
         
         .chart-container {
@@ -116,7 +233,7 @@
         }
         
         .stat-card {
-            background: #f8f9fa;
+            background: var(--bg-card);
             padding: 20px;
             border-radius: 8px;
             text-align: center;
@@ -125,11 +242,11 @@
         .stat-value {
             font-size: 24px;
             font-weight: bold;
-            color: #007bff;
+            color: var(--stat-blue);
         }
         
         .stat-label {
-            color: #666;
+            color: var(--text-secondary);
             margin-top: 5px;
         }
         
@@ -139,7 +256,7 @@
         
         .task-item {
             padding: 15px;
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             margin-bottom: 10px;
             cursor: pointer;
@@ -147,7 +264,7 @@
         }
         
         .task-item:hover {
-            background-color: #f8f9fa;
+            background-color: var(--bg-card);
         }
         
         .task-header {
@@ -161,12 +278,12 @@
         }
         
         .task-time {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 14px;
         }
         
         .task-status {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 14px;
             display: flex;
             align-items: center;
@@ -185,7 +302,7 @@
         .task-sessions {
             margin-top: 15px;
             padding-top: 15px;
-            border-top: 1px solid #e0e0e0;
+            border-top: 1px solid var(--border-color);
             display: none;
         }
         
@@ -195,7 +312,7 @@
         
         .session-item {
             padding: 10px;
-            background: #f8f9fa;
+            background: var(--bg-card);
             border-radius: 6px;
             margin-bottom: 8px;
             font-size: 14px;
@@ -205,17 +322,17 @@
         }
         
         .session-time {
-            color: #666;
+            color: var(--text-secondary);
         }
         
         .session-duration {
             font-weight: 500;
-            color: #007bff;
+            color: var(--stat-blue);
         }
         
         .no-data {
             text-align: center;
-            color: #666;
+            color: var(--text-secondary);
             padding: 40px;
         }
     </style>
@@ -230,6 +347,13 @@
                 <label for="fileInput" class="file-input-label">Choose JSON File</label>
             </div>
             
+            <div class="theme-toggle">
+                <button onclick="toggleTheme()">
+                    <span class="theme-icon" id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+            </div>
+            
             <div class="datetime-range">
                 <label>Datetime range:</label>
                 <input type="datetime-local" id="startDateTime">
@@ -237,6 +361,12 @@
                 <input type="datetime-local" id="endDateTime">
                 <button onclick="applyDateTimeRange()">Apply</button>
                 <button onclick="clearDateTimeRange()">Clear</button>
+            </div>
+            
+            <div class="day-navigation">
+                <button onclick="navigateToPreviousDay()">← Prev Day</button>
+                <button onclick="navigateToToday()">Today</button>
+                <button onclick="navigateToNextDay()">Next Day →</button>
             </div>
             
             <div class="height-control">
@@ -265,6 +395,44 @@
     <script>
         let timerData = null;
         let currentDateTimeRange = null;
+        
+        // Theme management
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            // Use saved theme if available, otherwise use system preference
+            const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+            applyTheme(theme);
+        }
+        
+        function applyTheme(theme) {
+            const root = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            const themeText = document.getElementById('themeText');
+            
+            if (theme === 'dark') {
+                root.setAttribute('data-theme', 'dark');
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Light';
+            } else {
+                root.removeAttribute('data-theme');
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Dark';
+            }
+            
+            localStorage.setItem('theme', theme);
+        }
+        
+        function toggleTheme() {
+            const root = document.documentElement;
+            const currentTheme = root.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(newTheme);
+        }
+        
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', initTheme);
         
         document.getElementById('chartHeight').addEventListener('input', function() {
             const height = this.value;
@@ -356,6 +524,109 @@
             updateVisualization();
         }
         
+        function navigateToToday() {
+            const currentStart = document.getElementById('startDateTime').value;
+            const currentEnd = document.getElementById('endDateTime').value;
+            
+            let startHour = 0, startMinute = 0, endHour = 23, endMinute = 59;
+            
+            // Extract time from current selection if available
+            if (currentStart) {
+                const currentStartDate = new Date(currentStart);
+                startHour = currentStartDate.getHours();
+                startMinute = currentStartDate.getMinutes();
+            }
+            
+            if (currentEnd) {
+                const currentEndDate = new Date(currentEnd);
+                endHour = currentEndDate.getHours();
+                endMinute = currentEndDate.getMinutes();
+            }
+            
+            const today = new Date();
+            const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0);
+            const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour, endMinute, 59);
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(startOfToday);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(endOfToday);
+            
+            currentDateTimeRange = {
+                start: startOfToday,
+                end: endOfToday
+            };
+            updateVisualization();
+        }
+        
+        function navigateToPreviousDay() {
+            const currentStart = document.getElementById('startDateTime').value;
+            const currentEnd = document.getElementById('endDateTime').value;
+            
+            if (!currentStart) {
+                // If no current selection, use today with default time
+                navigateToToday();
+                return;
+            }
+            
+            const currentStartDate = new Date(currentStart);
+            const currentEndDate = new Date(currentEnd);
+            
+            // Shift the entire range back by 1 day
+            const prevStartDate = new Date(currentStartDate);
+            prevStartDate.setDate(prevStartDate.getDate() - 1);
+            
+            const prevEndDate = new Date(currentEndDate);
+            prevEndDate.setDate(prevEndDate.getDate() - 1);
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(prevStartDate);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(prevEndDate);
+            
+            currentDateTimeRange = {
+                start: prevStartDate,
+                end: prevEndDate
+            };
+            updateVisualization();
+        }
+        
+        function navigateToNextDay() {
+            const currentStart = document.getElementById('startDateTime').value;
+            const currentEnd = document.getElementById('endDateTime').value;
+            
+            if (!currentStart) {
+                // If no current selection, use today with default time
+                navigateToToday();
+                return;
+            }
+            
+            const currentStartDate = new Date(currentStart);
+            const currentEndDate = new Date(currentEnd);
+            
+            // Shift the entire range forward by 1 day
+            const nextStartDate = new Date(currentStartDate);
+            nextStartDate.setDate(nextStartDate.getDate() + 1);
+            
+            const nextEndDate = new Date(currentEndDate);
+            nextEndDate.setDate(nextEndDate.getDate() + 1);
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(nextStartDate);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(nextEndDate);
+            
+            currentDateTimeRange = {
+                start: nextStartDate,
+                end: nextEndDate
+            };
+            updateVisualization();
+        }
+        
+        function formatDateTimeLocal(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+        
         function updateVisualization() {
             if (!timerData) return;
             
@@ -415,6 +686,31 @@
             return filtered;
         }
         
+        function getInactivityPeriods(sessions) {
+            if (sessions.length === 0) return [];
+            
+            // Sort sessions by start time
+            const sortedSessions = [...sessions].sort((a, b) => a[0] - b[0]);
+            
+            const inactivityPeriods = [];
+            
+            for (let i = 0; i < sortedSessions.length - 1; i++) {
+                const currentSession = sortedSessions[i];
+                const nextSession = sortedSessions[i + 1];
+                
+                const gapStart = currentSession[1];
+                const gapEnd = nextSession[0];
+                const gapDuration = gapEnd - gapStart;
+                
+                // Check if gap is > 10 minutes (600 seconds)
+                if (gapDuration > 600) {
+                    inactivityPeriods.push([gapStart, gapEnd]);
+                }
+            }
+            
+            return inactivityPeriods;
+        }
+        
         function updateChart(data) {
             console.log('updateChart called with data:', data);
             console.log('Number of tasks in filtered data:', data.value.length);
@@ -443,15 +739,33 @@
                 type: 'scatter',
                 mode: 'lines',
                 line: {
-                    color: '#888888',
-                    width: 12
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--chart-active'),
+                    width: 8
                 },
                 name: '[ACTIVE]',
                 hoverinfo: 'text',
-                text: `[ACTIVE]<br>Start: ${new Date(session[0] * 1000).toLocaleString()}<br>End: ${new Date(session[1] * 1000).toLocaleString()}<br>Duration: ${((session[1] - session[0]) / 60).toFixed(1)} min`
+                text: `[ACTIVE]<br>Start: ${new Date(session[0] * 1000).toLocaleString()}<br>End: ${new Date(session[1] * 1000).toLocaleString()}<br>Duration: ${formatTime(Math.round((session[1] - session[0]) / 60))}`
             }));
             
             traces.push(...activeTraces);
+            
+            // Add inactivity periods (light gray spans) at position 0 to show on same line as active sessions
+            const inactivityPeriods = getInactivityPeriods(allActiveSessions);
+            const inactivityTraces = inactivityPeriods.map(period => ({
+                x: [new Date(period[0] * 1000), new Date(period[1] * 1000)],
+                y: [0, 0],
+                type: 'scatter',
+                mode: 'lines',
+                line: {
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--chart-inactive'),
+                    width: 8
+                },
+                name: '[INACTIVE]',
+                hoverinfo: 'text',
+                text: `[INACTIVE]<br>Start: ${new Date(period[0] * 1000).toLocaleString()}<br>End: ${new Date(period[1] * 1000).toLocaleString()}<br>Duration: ${formatTime(Math.round((period[1] - period[0]) / 60))}`
+            }));
+            
+            traces.push(...inactivityTraces);
             
             // Add regular tasks starting from position 1
             data.value.forEach((task, index) => {
@@ -468,7 +782,7 @@
                     },
                     name: task.name,
                     hoverinfo: 'text',
-                    text: `${task.name}<br>Start: ${new Date(session[0] * 1000).toLocaleString()}<br>End: ${new Date(session[1] * 1000).toLocaleString()}<br>Duration: ${((session[1] - session[0]) / 60).toFixed(1)} min`
+                    text: `${task.name}<br>Start: ${new Date(session[0] * 1000).toLocaleString()}<br>End: ${new Date(session[1] * 1000).toLocaleString()}<br>Duration: ${formatTime(Math.round((session[1] - session[0]) / 60))}`
                 }));
                 
                 traces.push(...sessionData);
@@ -478,13 +792,24 @@
             
             // Prepare layout with range selector and slider
             const chartHeight = document.getElementById('chartHeight').value;
+            const computedStyle = getComputedStyle(document.documentElement);
             let layout = {
                 title: {
-                    text: 'Timer Sessions Timeline'
+                    text: 'Timer Sessions Timeline',
+                    font: {
+                        color: computedStyle.getPropertyValue('--text-primary')
+                    }
                 },
                 xaxis: {
                     title: 'Time',
                     type: 'date',
+                    titlefont: {
+                        color: computedStyle.getPropertyValue('--text-primary')
+                    },
+                    tickfont: {
+                        color: computedStyle.getPropertyValue('--text-secondary')
+                    },
+                    gridcolor: computedStyle.getPropertyValue('--border-color'),
                     rangeselector: {
                         buttons: [
                             {
@@ -522,6 +847,13 @@
                     title: 'Tasks',
                     tickvals: [0, ...data.value.map((_, index) => index + 1)],
                     ticktext: ['[ACTIVE]', ...data.value.map(task => task.name)],
+                    titlefont: {
+                        color: computedStyle.getPropertyValue('--text-primary')
+                    },
+                    tickfont: {
+                        color: computedStyle.getPropertyValue('--text-secondary')
+                    },
+                    gridcolor: computedStyle.getPropertyValue('--border-color'),
                     fixedrange: true
                 },
                 showlegend: false,
@@ -531,7 +863,9 @@
                     r: 50,
                     t: 50,
                     b: 100
-                }
+                },
+                paper_bgcolor: computedStyle.getPropertyValue('--bg-secondary'),
+                plot_bgcolor: computedStyle.getPropertyValue('--bg-secondary')
             };
             
             // Set time range based on datetime range
@@ -597,15 +931,15 @@
                     <div class="stat-label">Avg Session</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" style="color: #007bff;">${activeTasks}</div>
+                    <div class="stat-value" style="color: var(--stat-blue);">${activeTasks}</div>
                     <div class="stat-label">Active</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" style="color: #28a745;">${finishedTasks}</div>
+                    <div class="stat-value" style="color: var(--stat-green);">${finishedTasks}</div>
                     <div class="stat-label">Finished</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" style="color: #dc3545;">${droppedTasks}</div>
+                    <div class="stat-value" style="color: var(--stat-red);">${droppedTasks}</div>
                     <div class="stat-label">Dropped</div>
                 </div>
             `;
@@ -624,7 +958,7 @@
                     return `
                         <div class="session-item">
                             <div class="session-time">
-                                ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}
+                                ${startTime.toLocaleString()} - ${endTime.toLocaleString()}
                             </div>
                             <div class="session-duration">${duration} min</div>
                         </div>
@@ -640,7 +974,7 @@
                             </div>
                             <div class="task-status">
                                 <span class="expand-icon" id="expand-icon-${taskIndex}">▶</span>
-                                <span style="color: ${task.state === 0 ? '#007bff' : task.state === 1 ? '#28a745' : '#dc3545'}">
+                                <span style="color: ${task.state === 0 ? 'var(--stat-blue)' : task.state === 1 ? 'var(--stat-green)' : 'var(--stat-red)'}">
                                     ${task.state === 0 ? 'Active' : task.state === 1 ? 'Finished' : 'Dropped'}
                                 </span>
                             </div>
