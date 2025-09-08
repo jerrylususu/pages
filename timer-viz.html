@@ -361,6 +361,7 @@
                 <input type="datetime-local" id="endDateTime">
                 <button onclick="applyDateTimeRange()">Apply</button>
                 <button onclick="clearDateTimeRange()">Clear</button>
+                <button onclick="autoFitDateTimeRange()">Auto Fit</button>
             </div>
             
             <div class="day-navigation">
@@ -1022,6 +1023,58 @@
             document.getElementById('startDateTime').value = '';
             document.getElementById('endDateTime').value = '';
             currentDateTimeRange = null;
+            updateVisualization();
+        }
+        
+        function autoFitDateTimeRange() {
+            if (!timerData) return;
+            
+            // First, filter the data based on the current datetime range (if any)
+            const filteredData = filterDataByDateTime(timerData, currentDateTimeRange);
+            
+            if (filteredData.value.length === 0) {
+                alert('No sessions found in the current datetime range');
+                return;
+            }
+            
+            // Find the earliest session start and latest session end
+            let earliestStart = null;
+            let latestEnd = null;
+            
+            filteredData.value.forEach(task => {
+                task.sessions.forEach(session => {
+                    const sessionStart = session[0];
+                    const sessionEnd = session[1];
+                    
+                    if (earliestStart === null || sessionStart < earliestStart) {
+                        earliestStart = sessionStart;
+                    }
+                    
+                    if (latestEnd === null || sessionEnd > latestEnd) {
+                        latestEnd = sessionEnd;
+                    }
+                });
+            });
+            
+            if (earliestStart === null || latestEnd === null) {
+                alert('No sessions found');
+                return;
+            }
+            
+            // Convert to Date objects
+            const startDate = new Date(earliestStart * 1000);
+            const endDate = new Date(latestEnd * 1000);
+            
+            // Update the datetime inputs
+            document.getElementById('startDateTime').value = formatDateTimeLocal(startDate);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(endDate);
+            
+            // Update the current datetime range
+            currentDateTimeRange = {
+                start: startDate,
+                end: endDate
+            };
+            
             updateVisualization();
         }
     </script>
