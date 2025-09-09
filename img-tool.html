@@ -142,6 +142,67 @@
             color: #666;
             margin-left: 10px;
         }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+
+        .drop-zone-active {
+            border-color: var(--primary-color);
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        .preset-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            font-size: 12px;
+            color: #333;
+            transition: all 0.2s ease;
+        }
+
+        .preset-btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .preset-btn:active {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
@@ -155,15 +216,19 @@
 
     <div class="main-container">
         <div class="preview-container" id="previewContainer">
-            <div id="uploadPrompt">点击或拖拽图片到此处</div>
+            <div id="uploadPrompt">点击或拖拽图片到此处，或按 Ctrl+V 粘贴</div>
             <img id="previewImage" class="preview-image" style="display: none">
             <div id="cropOverlay" class="crop-overlay" style="display: none"></div>
+            <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">处理中...</div>
+            </div>
         </div>
 
         <div class="controls">
             <div class="control-group">
                 <label for="fileInput" id="fileInputLabel">选择图片</label>
-                <input type="file" id="fileInput" accept="image/*">
+                <input type="file" id="fileInput" accept="image/*,.pdf">
             </div>
 
             <div class="control-group">
@@ -183,12 +248,31 @@
 
             <div class="control-group">
                 <label for="scaleSlider" id="scaleSliderLabel">缩放比例</label>
-                <input type="range" id="scaleSlider" min="10" max="500" value="100" step="1">
-                <span id="scaleValue">100%</span>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <button type="button" id="scaleDecreaseBtn" style="width: 40px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: #f0f0f0; cursor: pointer;">-</button>
+                    <input type="number" id="scaleInput" min="10" max="500" value="100" step="1" style="width: 80px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;">
+                    <button type="button" id="scaleIncreaseBtn" style="width: 40px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: #f0f0f0; cursor: pointer;">+</button>
+                    <span id="scaleValue">100%</span>
+                </div>
+                <input type="range" id="scaleSlider" min="10" max="500" value="100" step="1" style="width: 100%;">
+            </div>
+
+            <div class="control-group">
+                <label id="sizePresetLabel">快速尺寸</label>
+                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                    <button type="button" id="idPhotoBtn" class="preset-btn">证件照</button>
+                    <button type="button" id="a4LandscapeBtn" class="preset-btn">A4横向</button>
+                    <button type="button" id="a4PortraitBtn" class="preset-btn">A4纵向</button>
+                </div>
             </div>
 
             <button class="btn" id="processButton" disabled>处理图片</button>
             <button class="btn" id="downloadButton" disabled>下载图片</button>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn" id="rotateLeftBtn" disabled>↺ 左转90°</button>
+                <button class="btn" id="rotateRightBtn" disabled>↻ 右转90°</button>
+            </div>
 
             <div id="progressBar" class="progress-bar" style="display: none">
                 <div class="progress-bar-fill" id="progressBarFill"></div>
@@ -207,13 +291,34 @@
         </div>
     </div>
 
+    <!-- PDF Page Selection Modal -->
+    <div id="pdfModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+        <div style="background-color: white; margin: 15% auto; padding: 20px; border-radius: 8px; width: 400px; max-width: 90%;">
+            <h3 id="pdfModalTitle">Select PDF Page</h3>
+            <div class="control-group">
+                <label for="pdfPageSelect" id="pdfPageSelectLabel">Page:</label>
+                <select id="pdfPageSelect" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="pdfDpiInput" id="pdfDpiLabel">DPI:</label>
+                <input type="number" id="pdfDpiInput" min="72" max="600" value="300" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button id="pdfConvertBtn" class="btn" style="flex: 1;">Convert</button>
+                <button id="pdfCancelBtn" class="btn" style="flex: 1; background-color: #f44336;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         // 语言配置
         const translations = {
             zh: {
                 title: '图片裁剪压缩工具',
-                uploadPrompt: '点击或拖拽图片到此处',
+                uploadPrompt: '点击或拖拽图片到此处，或按 Ctrl+V 粘贴',
                 fileInput: '选择图片',
                 cropWidth: '裁剪宽度 (像素)',
                 cropHeight: '裁剪高度 (像素)',
@@ -226,11 +331,26 @@
                 scaleSlider: '缩放比例',
                 processResult: '处理结果',
                 compressionQuality: '压缩质量',
-                fileSize: '文件大小'
+                fileSize: '文件大小',
+                pdfModalTitle: '选择PDF页面',
+                pdfPageSelect: '页面:',
+                pdfDpi: 'DPI:',
+                pdfConvert: '转换',
+                pdfCancel: '取消',
+                pdfError: 'PDF处理失败',
+                rotateLeft: '↺ 左转90°',
+                rotateRight: '↻ 右转90°',
+                loadingPdf: '正在加载PDF...',
+                convertingPdf: '正在转换PDF页面...',
+                processingFile: '正在处理文件...',
+                sizePreset: '快速尺寸',
+                idPhoto: '证件照',
+                a4Landscape: 'A4横向',
+                a4Portrait: 'A4纵向'
             },
             en: {
                 title: 'Image Crop & Compress Tool',
-                uploadPrompt: 'Click or drag image here',
+                uploadPrompt: 'Click or drag image here, or press Ctrl+V to paste',
                 fileInput: 'Choose Image',
                 cropWidth: 'Crop Width (pixels)',
                 cropHeight: 'Crop Height (pixels)',
@@ -243,7 +363,22 @@
                 scaleSlider: 'Scale',
                 processResult: 'Process Result',
                 compressionQuality: 'Compression Quality',
-                fileSize: 'File Size'
+                fileSize: 'File Size',
+                pdfModalTitle: 'Select PDF Page',
+                pdfPageSelect: 'Page:',
+                pdfDpi: 'DPI:',
+                pdfConvert: 'Convert',
+                pdfCancel: 'Cancel',
+                pdfError: 'PDF processing failed',
+                rotateLeft: '↺ Rotate Left',
+                rotateRight: '↻ Rotate Right',
+                loadingPdf: 'Loading PDF...',
+                convertingPdf: 'Converting PDF page...',
+                processingFile: 'Processing file...',
+                sizePreset: 'Quick Size',
+                idPhoto: 'ID Photo',
+                a4Landscape: 'A4 Landscape',
+                a4Portrait: 'A4 Portrait'
             }
         };
 
@@ -274,11 +409,28 @@
             scaleSlider: document.getElementById('scaleSlider'),
             scaleSliderLabel: document.getElementById('scaleSliderLabel'),
             scaleValue: document.getElementById('scaleValue'),
+            scaleInput: document.getElementById('scaleInput'),
+            scaleDecreaseBtn: document.getElementById('scaleDecreaseBtn'),
+            scaleIncreaseBtn: document.getElementById('scaleIncreaseBtn'),
             resultInfo: document.getElementById('resultInfo'),
             processResultTitle: document.getElementById('processResultTitle'),
             processedPreview: document.getElementById('processedPreview'),
             qualityValue: document.getElementById('qualityValue'),
-            fileSizeValue: document.getElementById('fileSizeValue')
+            fileSizeValue: document.getElementById('fileSizeValue'),
+            pdfModal: document.getElementById('pdfModal'),
+            pdfModalTitle: document.getElementById('pdfModalTitle'),
+            pdfPageSelect: document.getElementById('pdfPageSelect'),
+            pdfDpiInput: document.getElementById('pdfDpiInput'),
+            pdfConvertBtn: document.getElementById('pdfConvertBtn'),
+            pdfCancelBtn: document.getElementById('pdfCancelBtn'),
+            rotateLeftBtn: document.getElementById('rotateLeftBtn'),
+            rotateRightBtn: document.getElementById('rotateRightBtn'),
+            loadingOverlay: document.getElementById('loadingOverlay'),
+            loadingText: document.getElementById('loadingText'),
+            sizePresetLabel: document.getElementById('sizePresetLabel'),
+            idPhotoBtn: document.getElementById('idPhotoBtn'),
+            a4LandscapeBtn: document.getElementById('a4LandscapeBtn'),
+            a4PortraitBtn: document.getElementById('a4PortraitBtn')
         };
 
         // 更新界面语言
@@ -296,6 +448,15 @@
             elements.downloadButton.textContent = t.download;
             elements.scaleSliderLabel.textContent = t.scaleSlider;
             elements.processResultTitle.textContent = t.processResult;
+            elements.pdfModalTitle.textContent = t.pdfModalTitle;
+            elements.pdfConvertBtn.textContent = t.pdfConvert;
+            elements.pdfCancelBtn.textContent = t.pdfCancel;
+            elements.rotateLeftBtn.textContent = t.rotateLeft;
+            elements.rotateRightBtn.textContent = t.rotateRight;
+            elements.sizePresetLabel.textContent = t.sizePreset;
+            elements.idPhotoBtn.textContent = t.idPhoto;
+            elements.a4LandscapeBtn.textContent = t.a4Landscape;
+            elements.a4PortraitBtn.textContent = t.a4Portrait;
         }
 
         // 语言切换事件
@@ -312,20 +473,53 @@
             width: 0,
             height: 0
         };
+        let currentRotation = 0;
+        
+        // PDF相关变量
+        let currentPdfFile = null;
+        let pdfDoc = null;
+        
+        // 配置PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // 显示/隐藏加载状态的辅助函数
+        function showLoading(message) {
+            elements.loadingText.textContent = message || translations[currentLang].processingFile;
+            elements.loadingOverlay.style.display = 'flex';
+        }
+
+        function hideLoading() {
+            elements.loadingOverlay.style.display = 'none';
+        }
 
         // 文件选择处理
         elements.fileInput.addEventListener('change', handleFileSelect);
         elements.previewContainer.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            elements.previewContainer.classList.add('drop-zone-active');
+        });
+        elements.previewContainer.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            elements.previewContainer.classList.remove('drop-zone-active');
         });
         elements.previewContainer.addEventListener('drop', handleFileDrop);
+        
+        // 粘贴事件处理
+        document.addEventListener('paste', handlePaste);
 
         // 处理文件选择
         function handleFileSelect(e) {
             const file = e.target.files[0];
             if (file) {
-                loadImage(file);
+                if (file.type.startsWith('image/')) {
+                    loadImage(file);
+                } else if (file.type === 'application/pdf') {
+                    handlePdfFile(file);
+                } else {
+                    showError(translations[currentLang].errorFormat);
+                }
             }
         }
 
@@ -333,14 +527,136 @@
         function handleFileDrop(e) {
             e.preventDefault();
             e.stopPropagation();
+            elements.previewContainer.classList.remove('drop-zone-active');
             
             const file = e.dataTransfer.files[0];
             if (file && file.type.startsWith('image/')) {
                 loadImage(file);
+            } else if (file && file.type === 'application/pdf') {
+                handlePdfFile(file);
             } else {
                 showError(translations[currentLang].errorFormat);
             }
         }
+
+        // 处理粘贴事件
+        function handlePaste(e) {
+            const items = e.clipboardData.items;
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    const file = item.getAsFile();
+                    if (file) {
+                        loadImage(file);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // 处理PDF文件
+        async function handlePdfFile(file) {
+            currentPdfFile = file;
+            showLoading(translations[currentLang].loadingPdf);
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                // 清空页面选择器
+                elements.pdfPageSelect.innerHTML = '';
+                
+                hideLoading();
+                
+                // 如果只有一页，自动选择
+                if (pdfDoc.numPages === 1) {
+                    await convertPdfPageToImage(1, 300);
+                } else {
+                    // 多页情况，显示选择对话框
+                    for (let i = 1; i <= pdfDoc.numPages; i++) {
+                        const option = document.createElement('option');
+                        option.value = i;
+                        option.textContent = `Page ${i}`;
+                        elements.pdfPageSelect.appendChild(option);
+                    }
+                    
+                    // 更新页面选择器的标签
+                    const pageLabels = elements.pdfModal.querySelectorAll('label');
+                    pageLabels[0].textContent = translations[currentLang].pdfPageSelect;
+                    pageLabels[1].textContent = translations[currentLang].pdfDpi;
+                    
+                    elements.pdfModal.style.display = 'block';
+                }
+            } catch (error) {
+                hideLoading();
+                showError(translations[currentLang].pdfError);
+            }
+        }
+
+        // 转换PDF页面为图片
+        async function convertPdfPageToImage(pageNumber, dpi) {
+            showLoading(translations[currentLang].convertingPdf);
+            
+            try {
+                const page = await pdfDoc.getPage(pageNumber);
+                const scale = dpi / 96; // 96 DPI是默认值
+                const viewport = page.getViewport({ scale: scale });
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                await page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                }).promise;
+                
+                // 将canvas转换为图片
+                canvas.toBlob((blob) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        hideLoading();
+                        originalImage = img;
+                        currentRotation = 0;
+                        elements.previewImage.src = canvas.toDataURL();
+                        elements.previewImage.style.display = 'block';
+                        elements.uploadPrompt.style.display = 'none';
+                        elements.processButton.disabled = false;
+                        elements.rotateLeftBtn.disabled = false;
+                        elements.rotateRightBtn.disabled = false;
+                        
+                        // 设置默认裁剪尺寸
+                        const rotatedDimensions = getRotatedDimensions(img.width, img.height, currentRotation);
+                        elements.cropWidth.value = rotatedDimensions.width;
+                        elements.cropHeight.value = rotatedDimensions.height;
+                        updateCropOverlay();
+                    };
+                    img.src = canvas.toDataURL();
+                }, 'image/png');
+                
+                elements.pdfModal.style.display = 'none';
+            } catch (error) {
+                hideLoading();
+                showError(translations[currentLang].pdfError);
+            }
+        }
+
+        // PDF模态框事件监听
+        elements.pdfConvertBtn.addEventListener('click', () => {
+            const pageNumber = parseInt(elements.pdfPageSelect.value);
+            const dpi = parseInt(elements.pdfDpiInput.value);
+            convertPdfPageToImage(pageNumber, dpi);
+        });
+
+        elements.pdfCancelBtn.addEventListener('click', () => {
+            elements.pdfModal.style.display = 'none';
+            currentPdfFile = null;
+            pdfDoc = null;
+        });
 
         // 加载图片
         function loadImage(file) {
@@ -349,19 +665,48 @@
                 const img = new Image();
                 img.onload = () => {
                     originalImage = img;
+                    currentRotation = 0;
                     elements.previewImage.src = e.target.result;
                     elements.previewImage.style.display = 'block';
                     elements.uploadPrompt.style.display = 'none';
                     elements.processButton.disabled = false;
+                    elements.rotateLeftBtn.disabled = false;
+                    elements.rotateRightBtn.disabled = false;
                     
                     // 设置默认裁剪尺寸
-                    elements.cropWidth.value = img.width;
-                    elements.cropHeight.value = img.height;
+                    const rotatedDimensions = getRotatedDimensions(img.width, img.height, currentRotation);
+                    elements.cropWidth.value = rotatedDimensions.width;
+                    elements.cropHeight.value = rotatedDimensions.height;
                     updateCropOverlay();
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
+        }
+
+        // ============== 旋转与显示辅助（核心修复） ==============
+        function getRotatedDimensions(width, height, rotation) {
+            const r = ((rotation % 360) + 360) % 360;
+            return (r === 90 || r === 270) ? { width: height, height: width } : { width, height };
+        }
+        function createRotatedCanvas(img, rotation) {
+            const { width: rw, height: rh } = getRotatedDimensions(img.width, img.height, rotation);
+            const canvas = document.createElement('canvas');
+            canvas.width = rw;
+            canvas.height = rh;
+            const ctx = canvas.getContext('2d');
+            ctx.translate(rw / 2, rh / 2);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            return canvas;
+        }
+        function updateImageDisplay() {
+            if (!originalImage) return;
+            const rotatedCanvas = createRotatedCanvas(originalImage, currentRotation);
+            elements.previewImage.onload = () => {
+                updateCropOverlay();
+            };
+            elements.previewImage.src = rotatedCanvas.toDataURL();
         }
 
         // 更新裁剪框
@@ -370,44 +715,41 @@
             const height = parseInt(elements.cropHeight.value) || 0;
             
             if (width && height && originalImage) {
-                const scale = elements.previewImage.width / originalImage.width;
+                const rotatedDimensions = getRotatedDimensions(originalImage.width, originalImage.height, currentRotation);
+                const displayW = elements.previewImage.width;
+                const displayH = elements.previewImage.height;
+                const scaleXDisp = displayW / rotatedDimensions.width;
+                const scaleYDisp = displayH / rotatedDimensions.height;
+                const scaleDisp = Math.min(scaleXDisp, scaleYDisp);
                 const scaleMultiplier = parseInt(elements.scaleSlider.value) / 100;
-                
-                // 计算新的尺寸，但不超过原图尺寸
-                const newWidth = Math.min(width * scale * scaleMultiplier, elements.previewImage.width);
-                const newHeight = Math.min(height * scale * scaleMultiplier, elements.previewImage.height);
-                
-                // 获取当前裁剪框的位置
+
+                const newWidth = Math.min(width * scaleDisp * scaleMultiplier, displayW);
+                const newHeight = Math.min(height * scaleDisp * scaleMultiplier, displayH);
+
                 const currentLeft = parseFloat(elements.cropOverlay.style.left) || 0;
                 const currentTop = parseFloat(elements.cropOverlay.style.top) || 0;
                 const currentWidth = parseFloat(elements.cropOverlay.style.width) || newWidth;
                 const currentHeight = parseFloat(elements.cropOverlay.style.height) || newHeight;
-                
-                // 计算中心点
                 const centerX = currentLeft + currentWidth / 2;
                 const centerY = currentTop + currentHeight / 2;
-                
-                // 计算新的位置，保持中心点不变
                 let newLeft = centerX - newWidth / 2;
                 let newTop = centerY - newHeight / 2;
-                
-                // 确保裁剪框不会超出图片边界
-                newLeft = Math.max(0, Math.min(newLeft, elements.previewImage.width - newWidth));
-                newTop = Math.max(0, Math.min(newTop, elements.previewImage.height - newHeight));
-                
-                // 更新裁剪框样式
+                newLeft = Math.max(0, Math.min(newLeft, displayW - newWidth));
+                newTop = Math.max(0, Math.min(newTop, displayH - newHeight));
+
                 elements.cropOverlay.style.display = 'block';
                 elements.cropOverlay.style.width = `${newWidth}px`;
                 elements.cropOverlay.style.height = `${newHeight}px`;
                 elements.cropOverlay.style.left = `${newLeft}px`;
                 elements.cropOverlay.style.top = `${newTop}px`;
-                
-                // 更新裁剪数据
+
+                const scaleX = rotatedDimensions.width / displayW;
+                const scaleY = rotatedDimensions.height / displayH;
                 cropData = {
-                    x: newLeft / scale,
-                    y: newTop / scale,
-                    width: width * scaleMultiplier,
-                    height: height * scaleMultiplier
+                    x: newLeft * scaleX,
+                    y: newTop * scaleY,
+                    width: newWidth * scaleX,
+                    height: newHeight * scaleY
                 };
             }
         }
@@ -438,10 +780,11 @@
             elements.cropOverlay.style.left = `${newLeft}px`;
             elements.cropOverlay.style.top = `${newTop}px`;
             
-            // 更新裁剪数据
-            const scale = elements.previewImage.width / originalImage.width;
-            cropData.x = newLeft / scale;
-            cropData.y = newTop / scale;
+            const rotatedDimensions = getRotatedDimensions(originalImage.width, originalImage.height, currentRotation);
+            const scaleX = rotatedDimensions.width / elements.previewImage.width;
+            const scaleY = rotatedDimensions.height / elements.previewImage.height;
+            cropData.x = newLeft * scaleX;
+            cropData.y = newTop * scaleY;
         });
 
         document.addEventListener('mouseup', () => {
@@ -458,20 +801,23 @@
                 elements.progressBar.style.display = 'block';
                 elements.processButton.disabled = true;
                 elements.errorMessage.textContent = '';
+                showLoading(translations[currentLang].processingFile);
 
-                // 创建离屏canvas进行裁剪
-                const canvas = document.createElement('canvas');
-                canvas.width = parseInt(elements.cropWidth.value);
-                canvas.height = parseInt(elements.cropHeight.value);
-                const ctx = canvas.getContext('2d');
-                
-                ctx.drawImage(
-                    originalImage,
-                    cropData.x, cropData.y,
-                    cropData.width, cropData.height,
-                    0, 0,
-                    canvas.width, canvas.height
-                );
+                // 1) 生成旋转后的源画布（关键修复：裁剪坐标在这个坐标系下）
+                const rotatedCanvas = createRotatedCanvas(originalImage, currentRotation);
+
+                // 2) 规范化裁剪区域，确保不越界
+                const sx = Math.max(0, Math.min(Math.round(cropData.x), rotatedCanvas.width));
+                const sy = Math.max(0, Math.min(Math.round(cropData.y), rotatedCanvas.height));
+                const sWidth = Math.max(1, Math.min(Math.round(cropData.width), rotatedCanvas.width - sx));
+                const sHeight = Math.max(1, Math.min(Math.round(cropData.height), rotatedCanvas.height - sy));
+
+                // 3) 创建输出画布，尺寸就是用户输入的宽高（不再因旋转互换）
+                const outCanvas = document.createElement('canvas');
+                outCanvas.width = parseInt(elements.cropWidth.value);
+                outCanvas.height = parseInt(elements.cropHeight.value);
+                const octx = outCanvas.getContext('2d');
+                octx.drawImage(rotatedCanvas, sx, sy, sWidth, sHeight, 0, 0, outCanvas.width, outCanvas.height);
 
                 // 使用二分搜索找到合适的压缩质量
                 let left = 0.01;  // 最低质量
@@ -487,7 +833,7 @@
                     elements.progressBarFill.style.width = `${((1 - (right - left)) * 100)}%`;
                     
                     const blob = await new Promise((resolve) => {
-                        canvas.toBlob((b) => resolve(b), 'image/jpeg', mid);
+                        outCanvas.toBlob((b) => resolve(b), 'image/jpeg', mid);
                     });
 
                     if (!blob) {
@@ -510,7 +856,7 @@
                 if (!bestBlob) {
                     // 尝试最低质量
                     const lowestQualityBlob = await new Promise((resolve) => {
-                        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.01);
+                        outCanvas.toBlob((b) => resolve(b), 'image/jpeg', 0.01);
                     });
 
                     if (!lowestQualityBlob || lowestQualityBlob.size > targetSize) {
@@ -543,6 +889,7 @@
             } catch (error) {
                 showError(error.message);
             } finally {
+                hideLoading();
                 elements.processButton.disabled = false;
                 elements.progressBar.style.display = 'none';
                 elements.progressBarFill.style.width = '0%';
@@ -568,11 +915,107 @@
         elements.cropWidth.addEventListener('input', updateCropOverlay);
         elements.cropHeight.addEventListener('input', updateCropOverlay);
 
+        // 同步所有缩放控件的函数
+        function syncScaleControls(value) {
+            const numValue = parseInt(value);
+            elements.scaleSlider.value = numValue;
+            elements.scaleInput.value = numValue;
+            elements.scaleValue.textContent = `${numValue}%`;
+            updateCropOverlay();
+        }
+
         // 添加滑块事件监听器
         elements.scaleSlider.addEventListener('input', (e) => {
-            elements.scaleValue.textContent = `${e.target.value}%`;
-            updateCropOverlay();
+            syncScaleControls(e.target.value);
         });
+
+        // 添加数字输入框事件监听器
+        elements.scaleInput.addEventListener('input', (e) => {
+            let value = parseInt(e.target.value);
+            if (isNaN(value)) value = 100;
+            if (value < 10) value = 10;
+            if (value > 500) value = 500;
+            syncScaleControls(value);
+        });
+
+        // 添加减少按钮事件监听器
+        elements.scaleDecreaseBtn.addEventListener('click', () => {
+            const currentValue = parseInt(elements.scaleSlider.value);
+            const newValue = Math.max(10, currentValue - 1);
+            syncScaleControls(newValue);
+        });
+
+        // 添加增加按钮事件监听器
+        elements.scaleIncreaseBtn.addEventListener('click', () => {
+            const currentValue = parseInt(elements.scaleSlider.value);
+            const newValue = Math.min(500, currentValue + 1);
+            syncScaleControls(newValue);
+        });
+
+        // 快速尺寸预设功能
+        function applySizePreset(width, height) {
+            if (!originalImage) return;
+            
+            const rotatedDimensions = getRotatedDimensions(originalImage.width, originalImage.height, currentRotation);
+            
+            // 计算缩放比例
+            const scaleX = width / rotatedDimensions.width;
+            const scaleY = height / rotatedDimensions.height;
+            const scale = Math.min(scaleX, scaleY);
+            
+            console.log(`Scale calculation: scaleX=${scaleX.toFixed(3)}, scaleY=${scaleY.toFixed(3)}, scale=${scale.toFixed(3)}`);
+            
+            // 如果图片比预设小，按比例缩放到合适的尺寸
+            if (scale < 1) {
+                const finalWidth = Math.round(rotatedDimensions.width * scale);
+                const finalHeight = Math.round(rotatedDimensions.height * scale);
+                
+                elements.cropWidth.value = finalWidth;
+                elements.cropHeight.value = finalHeight;
+            } else {
+                // 如果图片足够大，使用预设尺寸
+                elements.cropWidth.value = width;
+                elements.cropHeight.value = height;
+            }
+            
+            console.log(`Preset: ${width}x${height}, Image: ${rotatedDimensions.width}x${rotatedDimensions.height}, Result: ${elements.cropWidth.value}x${elements.cropHeight.value}`);
+            
+            updateCropOverlay();
+        }
+
+        // 快速尺寸预设按钮事件监听器
+        elements.idPhotoBtn.addEventListener('click', () => {
+            // 标准证件照尺寸 413x295 像素 (35x25mm @ 300dpi) - 纵向
+            applySizePreset(413, 295);
+        });
+
+        elements.a4LandscapeBtn.addEventListener('click', () => {
+            // A4横向尺寸 (3508x2480 像素 @ 300dpi) - 宽 > 高
+            applySizePreset(3508, 2480);
+        });
+
+        elements.a4PortraitBtn.addEventListener('click', () => {
+            // A4纵向尺寸 (2480x3508 像素 @ 300dpi) - 高 > 宽
+            applySizePreset(2480, 3508);
+        });
+
+        // 旋转交互（按钮）
+        function rotateImage(direction) {
+            if (!originalImage) return;
+            currentRotation = (direction === 'left') ? (currentRotation - 90 + 360) % 360 : (currentRotation + 90) % 360;
+            updateImageDisplay();
+            const oldWidth = parseInt(elements.cropWidth.value);
+            const oldHeight = parseInt(elements.cropHeight.value);
+            if (currentRotation === 90 || currentRotation === 270) {
+                elements.cropWidth.value = oldHeight;
+                elements.cropHeight.value = oldWidth;
+            } else {
+                elements.cropWidth.value = oldWidth;
+                elements.cropHeight.value = oldHeight;
+            }
+        }
+        elements.rotateLeftBtn.addEventListener('click', () => rotateImage('left'));
+        elements.rotateRightBtn.addEventListener('click', () => rotateImage('right'));
 
         // 初始化
         updateLanguage(currentLang);
