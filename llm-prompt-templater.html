@@ -83,6 +83,7 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            color: var(--text-primary);
         }
 
         .theme-toggle:hover {
@@ -361,6 +362,7 @@
 
         .input-section, .output-section {
             margin-bottom: 2rem;
+            margin-top: 2rem;
         }
 
         .full-width {
@@ -440,8 +442,8 @@
                     <div class="counter" id="inputCounter">0 words, 0 chars</div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">YouTube Subtitle</label>
-                    <textarea id="subtitle" class="form-control" placeholder="Paste YouTube subtitle here... (newlines will be removed automatically)" oninput="updateInputCounter()"></textarea>
+                    <label class="form-label">Input Text</label>
+                    <textarea id="subtitle" class="form-control" placeholder="Paste your text content here... (newlines will be removed automatically)" oninput="updateInputCounter()"></textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Select Prompt</label>
@@ -451,22 +453,35 @@
                 </div>
 
                 <div id="promptDisplay" style="display: none;">
-                    <div class="prompt-part">
-                        <label>System Prompt</label>
-                        <textarea id="systemPrompt" class="form-control" readonly></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 style="margin: 0; cursor: pointer;" onclick="togglePromptDisplay()" id="promptDisplayToggle">
+                            📄 Prompt Content <span id="expandIcon">▼</span>
+                        </h4>
+                        <button class="btn btn-sm btn-secondary" onclick="toggleEditMode()" id="editModeBtn" style="display: none;">
+                            ✏️ Edit Prompt
+                        </button>
                     </div>
-                    <div class="prompt-part">
-                        <label>Before Subtitle</label>
-                        <textarea id="beforeSubtitle" class="form-control" readonly></textarea>
-                    </div>
-                    <div class="prompt-part">
-                        <label>After Subtitle</label>
-                        <textarea id="afterSubtitle" class="form-control" readonly></textarea>
+                    <div id="promptContent" style="display: none;">
+                        <div class="prompt-part">
+                            <label>System Prompt</label>
+                            <textarea id="systemPrompt" class="form-control" readonly disabled></textarea>
+                        </div>
+                        <div class="prompt-part">
+                            <label>Before Input</label>
+                            <textarea id="beforeSubtitle" class="form-control" readonly disabled></textarea>
+                        </div>
+                        <div class="prompt-part">
+                            <label>After Input</label>
+                            <textarea id="afterSubtitle" class="form-control" readonly disabled></textarea>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic; display: none;" id="saveNote">
+                            💡 Changes are saved automatically in real-time
+                        </div>
                     </div>
                 </div>
 
-                <button class="btn" onclick="summarize()" id="summarizeBtn">
-                    🚀 Summarize
+                <button class="btn" onclick="process()" id="processBtn">
+                    🚀 Process
                 </button>
             </div>
         </div>
@@ -508,6 +523,8 @@
         let currentResponse = '';
         let startTime = null;
         let elapsedInterval = null;
+        let isEditMode = false;
+        let isPromptExpanded = false;
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
@@ -576,9 +593,9 @@
                 {
                     id: Date.now(),
                     name: "Default Summary",
-                    system: "You are a helpful assistant that summarizes YouTube video content. Provide a concise summary with key points.",
-                    before: "Please summarize the following YouTube video transcript:\n\n",
-                    after: "\n\nPlease provide a structured summary with main topics and key insights."
+                    system: "You are a helpful assistant that processes text content. Provide a concise response with key points.",
+                    before: "Please process the following text:\n\n",
+                    after: "\n\nPlease provide a structured response with main topics and key insights."
                 }
             ];
         }
@@ -606,13 +623,13 @@
         }
 
         function editPrompt(id) {
-            const prompt = prompts.find(p => p.id === id);
-            if (!prompt) return;
+            const promptObj = prompts.find(p => p.id === id);
+            if (!promptObj) return;
             
-            const newName = prompt("Enter new name:", prompt.name);
+            const newName = window.prompt("Enter new name:", promptObj.name);
             if (newName === null) return;
             
-            prompt.name = newName;
+            promptObj.name = newName;
             savePrompts();
             updatePromptsList();
             updatePromptSelect();
@@ -650,7 +667,7 @@
                 div.className = 'prompt-item';
                 div.innerHTML = `
                     <input type="text" value="${prompt.name}" readonly />
-                    <button class="btn btn-sm btn-secondary" onclick="editPrompt(${prompt.id})">✏️ Edit</button>
+                    <button class="btn btn-sm btn-secondary" onclick="editPrompt(${prompt.id})">✏️ Rename</button>
                     <button class="btn btn-sm btn-secondary" onclick="editPromptContent(${prompt.id})">📝 Edit Content</button>
                     <button class="btn btn-sm btn-danger" onclick="deletePrompt(${prompt.id})">🗑️ Delete</button>
                 `;
@@ -673,6 +690,7 @@
         function updatePromptDisplay() {
             const select = document.getElementById('promptSelect');
             const display = document.getElementById('promptDisplay');
+            const editBtn = document.getElementById('editModeBtn');
             
             if (select.value) {
                 currentPrompt = prompts.find(p => p.id == select.value);
@@ -681,27 +699,97 @@
                     document.getElementById('beforeSubtitle').value = currentPrompt.before;
                     document.getElementById('afterSubtitle').value = currentPrompt.after;
                     display.style.display = 'block';
-
-                    // Enable editing
-                    document.getElementById('systemPrompt').readOnly = false;
-                    document.getElementById('beforeSubtitle').readOnly = false;
-                    document.getElementById('afterSubtitle').readOnly = false;
-
-                    document.getElementById('systemPrompt').onchange = () => savePromptContent(currentPrompt.id);
-                    document.getElementById('beforeSubtitle').onchange = () => savePromptContent(currentPrompt.id);
-                    document.getElementById('afterSubtitle').onchange = () => savePromptContent(currentPrompt.id);
+                    editBtn.style.display = 'inline-flex';
+                    
+                    // Reset to view mode
+                    isEditMode = false;
+                    isPromptExpanded = false;
+                    setViewMode();
+                    collapsePromptDisplay();
                 }
             } else {
                 currentPrompt = null;
                 display.style.display = 'none';
-
-                // Disable editing
-                document.getElementById('systemPrompt').readOnly = true;
-                document.getElementById('beforeSubtitle').readOnly = true;
-                document.getElementById('afterSubtitle').readOnly = true;
+                editBtn.style.display = 'none';
             }
         }
 
+        function togglePromptDisplay() {
+            const content = document.getElementById('promptContent');
+            const icon = document.getElementById('expandIcon');
+            
+            if (isPromptExpanded) {
+                content.style.display = 'none';
+                icon.textContent = '▼';
+                isPromptExpanded = false;
+            } else {
+                content.style.display = 'block';
+                icon.textContent = '▲';
+                isPromptExpanded = true;
+            }
+        }
+        
+        function collapsePromptDisplay() {
+            const content = document.getElementById('promptContent');
+            const icon = document.getElementById('expandIcon');
+            content.style.display = 'none';
+            icon.textContent = '▼';
+            isPromptExpanded = false;
+        }
+        
+        function toggleEditMode() {
+            const btn = document.getElementById('editModeBtn');
+            const note = document.getElementById('saveNote');
+            
+            if (isEditMode) {
+                setViewMode();
+                btn.textContent = '✏️ Edit Prompt';
+                note.style.display = 'none';
+                isEditMode = false;
+            } else {
+                setEditMode();
+                btn.textContent = '💾 Save Changes';
+                note.style.display = 'block';
+                isEditMode = true;
+            }
+        }
+        
+        function setEditMode() {
+            const systemPrompt = document.getElementById('systemPrompt');
+            const beforeSubtitle = document.getElementById('beforeSubtitle');
+            const afterSubtitle = document.getElementById('afterSubtitle');
+            
+            systemPrompt.readOnly = false;
+            systemPrompt.disabled = false;
+            beforeSubtitle.readOnly = false;
+            beforeSubtitle.disabled = false;
+            afterSubtitle.readOnly = false;
+            afterSubtitle.disabled = false;
+            
+            // Add real-time saving
+            systemPrompt.oninput = () => savePromptContent(currentPrompt.id);
+            beforeSubtitle.oninput = () => savePromptContent(currentPrompt.id);
+            afterSubtitle.oninput = () => savePromptContent(currentPrompt.id);
+        }
+        
+        function setViewMode() {
+            const systemPrompt = document.getElementById('systemPrompt');
+            const beforeSubtitle = document.getElementById('beforeSubtitle');
+            const afterSubtitle = document.getElementById('afterSubtitle');
+            
+            systemPrompt.readOnly = true;
+            systemPrompt.disabled = true;
+            beforeSubtitle.readOnly = true;
+            beforeSubtitle.disabled = true;
+            afterSubtitle.readOnly = true;
+            afterSubtitle.disabled = true;
+            
+            // Remove event listeners
+            systemPrompt.oninput = null;
+            beforeSubtitle.oninput = null;
+            afterSubtitle.oninput = null;
+        }
+        
         function savePromptContent(id) {
             const prompt = prompts.find(p => p.id === id);
             if (!prompt) return;
@@ -766,13 +854,13 @@
             document.getElementById('outputCounter').style.display = 'block';
         }
 
-        // Summarization
-        async function summarize() {
+        // Processing
+        async function process() {
             if (isStreaming) return;
             
             const subtitle = document.getElementById('subtitle').value.trim();
             if (!subtitle) {
-                showStatus('Please paste the YouTube subtitle first.', 'error');
+                showStatus('Please paste your input text first.', 'error');
                 setTimeout(() => hideStatus(), 3000);
                 return;
             }
@@ -790,7 +878,7 @@
                 return;
             }
             
-            // Prepare subtitle (remove newlines)
+            // Prepare input text (remove newlines)
             const cleanSubtitle = subtitle.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
             
             // Prepare messages
@@ -804,8 +892,8 @@
             currentResponse = '';
             
             // Update UI
-            document.getElementById('summarizeBtn').textContent = 'Processing...';
-            document.getElementById('summarizeBtn').disabled = true;
+            document.getElementById('processBtn').textContent = 'Processing...';
+            document.getElementById('processBtn').disabled = true;
             document.getElementById('output').innerHTML = '';
             document.getElementById('exportBtn').style.display = 'none';
             document.getElementById('outputCounter').style.display = 'none';
@@ -825,8 +913,8 @@
             } finally {
                 isStreaming = false;
                 stopElapsedTimer();
-                document.getElementById('summarizeBtn').textContent = '🚀 Summarize';
-                document.getElementById('summarizeBtn').disabled = false;
+                document.getElementById('processBtn').textContent = '🚀 Process';
+                document.getElementById('processBtn').disabled = false;
                 document.getElementById('exportBtn').style.display = 'inline-flex';
                 
                 setTimeout(() => hideStatus(), 3000);
