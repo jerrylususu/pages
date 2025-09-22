@@ -9,100 +9,168 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: #1e1e1e;
-            color: #ffffff;
-            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e6e6e6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             justify-content: center;
             align-items: flex-start;
             min-height: 100vh;
-            padding: 2rem;
+            padding: 2rem 1rem;
         }
+        
         .container {
             width: 100%;
             max-width: 1200px;
         }
+        
         h1 {
-            font-size: 2.5rem;
-            margin-bottom: 2rem;
+            font-size: 2.8rem;
+            margin-bottom: 2.5rem;
             text-align: center;
             color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(90deg, #1e90ff, #ff9800);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
+        
         .section {
-            margin-bottom: 2rem;
+            margin-bottom: 3rem;
+            background: rgba(30, 30, 46, 0.6);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
+        
         .section-title {
-            font-size: 2rem;
-            margin-bottom: 1.5rem;
+            font-size: 2.2rem;
+            margin-bottom: 1.8rem;
             text-align: left;
-            border-bottom: 2px solid #444;
-            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #1e90ff;
+            padding-bottom: 0.8rem;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
         }
+        
+        .section-title::before {
+            content: "■";
+            color: #1e90ff;
+            margin-right: 12px;
+            font-size: 1.5rem;
+        }
+        
         .links-grid {
             display: flex;
             flex-wrap: wrap;
             gap: 1.5rem;
         }
+        
         .link-item {
-            flex: 1 1 calc(33.333% - 1.5rem); /* 三列布局 */
+            flex: 1 1 calc(33.333% - 1.5rem);
             max-width: calc(33.333% - 1.5rem);
-            background-color: #333333;
-            padding: 1rem;
-            border-radius: 8px;
-            transition: background-color 0.3s ease;
+            background: rgba(51, 51, 76, 0.7);
+            padding: 1.5rem;
+            border-radius: 10px;
+            transition: all 0.3s ease;
             box-sizing: border-box;
             min-width: 250px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
+        
         .link-item:hover {
-            background-color: #444444;
+            background: rgba(68, 68, 102, 0.8);
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            border-color: rgba(30, 144, 255, 0.3);
         }
+        
         a {
             text-decoration: none;
-            color: #1e90ff;
-            font-size: 1.5rem;
-            transition: color 0.3s ease;
+            color: #4fc3f7;
+            font-size: 1.4rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: block;
+            margin-bottom: 0.5rem;
         }
+        
         a:hover {
             color: #ff9800;
+            text-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
         }
+        
         p.description {
-            font-size: 0.9rem;
+            font-size: 1rem;
             color: #bbbbbb;
-            margin: 0.5rem 0 0;
+            margin: 0.8rem 0 0;
+            line-height: 1.5;
         }
+        
         .github-link {
             display: inline-block;
-            margin: 2rem auto 0; /* 上边距 2rem，自动水平居中 */
-            padding: 0.8rem 1.5rem;
-            background-color: #24292e;
+            margin: 2.5rem auto 0;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #24292e 0%, #0a0a0f 100%);
             color: #ffffff;
             text-decoration: none;
-            font-size: 1rem;
-            border-radius: 6px;
-            transition: background-color 0.3s ease;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
             text-align: center;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
+        
         .github-link:hover {
-            background-color: #2ea44f;
+            background: linear-gradient(135deg, #2ea44f 0%, #1a5a2c 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(46, 164, 79, 0.4);
         }
+        
         .end-links {
             text-align: center;
         }
+        
         @media (max-width: 1024px) {
             .link-item {
-                flex: 1 1 calc(50% - 1.5rem); /* 两列布局 */
+                flex: 1 1 calc(50% - 1.5rem);
                 max-width: calc(50% - 1.5rem);
             }
-        }
-        @media (max-width: 768px) {
-            .link-item {
-                flex: 1 1 calc(50% - 1.5rem); /* 保持两列布局 */
+            
+            h1 {
+                font-size: 2.4rem;
             }
         }
+        
+        @media (max-width: 768px) {
+            .link-item {
+                flex: 1 1 calc(50% - 1.5rem);
+            }
+            
+            .section-title {
+                font-size: 1.8rem;
+            }
+        }
+        
         @media (max-width: 480px) {
             .link-item {
-                flex: 1 1 100%; /* 小屏幕一列布局 */
+                flex: 1 1 100%;
                 max-width: 100%;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            body {
+                padding: 1rem 0.5rem;
             }
         }
     </style>
