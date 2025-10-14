@@ -335,6 +335,105 @@
             color: var(--text-secondary);
             padding: 40px;
         }
+        
+        .crop-warning {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .crop-warning:hover {
+            background: #f57c00;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: var(--bg-secondary);
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px var(--shadow-color);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            color: var(--text-primary);
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+        
+        .modal-body {
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .modal-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .modal-button-cancel {
+            background: var(--button-secondary);
+            color: white;
+        }
+        
+        .modal-button-cancel:hover {
+            background: var(--button-secondary-hover);
+        }
+        
+        .modal-button-confirm {
+            background: var(--button-success);
+            color: white;
+        }
+        
+        .modal-button-confirm:hover {
+            background: var(--button-success-hover);
+        }
     </style>
 </head>
 <body>
@@ -355,18 +454,19 @@
             </div>
             
             <div class="datetime-range">
-                <label>Datetime range:</label>
                 <input type="datetime-local" id="startDateTime">
                 <span>to</span>
                 <input type="datetime-local" id="endDateTime">
                 <button onclick="applyDateTimeRange()">Apply</button>
                 <button onclick="clearDateTimeRange()">Clear</button>
                 <button onclick="autoFitDateTimeRange()">Auto Fit</button>
+                <button onclick="cropData()" id="cropButton" style="background: var(--button-secondary);">Crop Data</button>
             </div>
             
             <div class="day-navigation">
                 <button onclick="navigateToPreviousDay()">← Prev Day</button>
                 <button onclick="navigateToToday()">Today</button>
+                <button onclick="navigateToFullDay()">Full Day</button>
                 <button onclick="navigateToNextDay()">Next Day →</button>
             </div>
             
@@ -390,6 +490,23 @@
         <div id="noDataMessage" class="no-data">
             Select a JSON file to visualize timer data<br>
             <small>Using data format from <a href="https://klaster1.github.io/timer-5/" target="_blank">https://klaster1.github.io/timer-5/</a></small>
+        </div>
+    </div>
+
+    <!-- Crop Confirmation Modal -->
+    <div id="cropModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Confirm Crop Data</h3>
+                <button class="modal-close" onclick="closeCropModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="cropModalBody">
+                <!-- Modal content will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button class="modal-button modal-button-cancel" onclick="closeCropModal()">Cancel</button>
+                <button class="modal-button modal-button-confirm" id="cropConfirmButton">Crop Data</button>
+            </div>
         </div>
     </div>
 
@@ -554,6 +671,28 @@
             currentDateTimeRange = {
                 start: startOfToday,
                 end: endOfToday
+            };
+            updateVisualization();
+        }
+        
+        function navigateToFullDay() {
+            const currentStart = document.getElementById('startDateTime').value;
+            let targetDate = new Date();
+            
+            // Use the date from current start selection if available, otherwise use today
+            if (currentStart) {
+                targetDate = new Date(currentStart);
+            }
+            
+            const startOfFullDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0);
+            const endOfFullDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59);
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(startOfFullDay);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(endOfFullDay);
+            
+            currentDateTimeRange = {
+                start: startOfFullDay,
+                end: endOfFullDay
             };
             updateVisualization();
         }
@@ -1029,11 +1168,22 @@
         function autoFitDateTimeRange() {
             if (!timerData) return;
             
-            // First, filter the data based on the current datetime range (if any)
-            const filteredData = filterDataByDateTime(timerData, currentDateTimeRange);
+            // Create a temporary datetime range for just the current day to get all sessions for that day
+            let dayRange = null;
+            if (currentDateTimeRange) {
+                // Use the same day as the current range but cover the full day
+                const dayStart = new Date(currentDateTimeRange.start);
+                dayStart.setHours(0, 0, 0, 0);
+                const dayEnd = new Date(currentDateTimeRange.start);
+                dayEnd.setHours(23, 59, 59, 999);
+                dayRange = { start: dayStart, end: dayEnd };
+            }
             
-            if (filteredData.value.length === 0) {
-                alert('No sessions found in the current datetime range');
+            // Filter data for the current day only (ignoring the current time range)
+            const dayFilteredData = filterDataByDateTime(timerData, dayRange);
+            
+            if (dayFilteredData.value.length === 0) {
+                alert('No sessions found for the current day');
                 return;
             }
             
@@ -1041,7 +1191,7 @@
             let earliestStart = null;
             let latestEnd = null;
             
-            filteredData.value.forEach(task => {
+            dayFilteredData.value.forEach(task => {
                 task.sessions.forEach(session => {
                     const sessionStart = session[0];
                     const sessionEnd = session[1];
@@ -1077,6 +1227,214 @@
             
             updateVisualization();
         }
+        
+        // Crop functionality
+        function updateCropButtonVisibility() {
+            const cropButton = document.getElementById('cropButton');
+            if (currentDateTimeRange && timerData) {
+                cropButton.style.display = 'inline-block';
+            } else {
+                cropButton.style.display = 'none';
+            }
+        }
+        
+        function cropData() {
+            if (!timerData) {
+                alert('Please load a JSON file first');
+                return;
+            }
+            
+            if (!currentDateTimeRange) {
+                alert('Please select a datetime range first');
+                return;
+            }
+            
+            console.log('Starting crop analysis for range:', currentDateTimeRange);
+            
+            const analysis = analyzeCropRange(timerData, currentDateTimeRange);
+            console.log('Crop analysis result:', analysis);
+            
+            if (analysis.hasOverlappingSessions) {
+                showCropConfirmationDialog(analysis);
+            } else {
+                // No overlapping sessions, proceed directly
+                performCrop(analysis);
+            }
+        }
+        
+        function analyzeCropRange(data, dateTimeRange) {
+            const analysis = {
+                totalTasks: data.value.length,
+                tasksWithSessionsInRange: 0,
+                fullyContainedSessions: 0,
+                overlappingSessions: 0,
+                excludedTasks: [],
+                hasOverlappingSessions: false,
+                croppedTasks: []
+            };
+            
+            data.value.forEach(task => {
+                const taskAnalysis = {
+                    name: task.name,
+                    originalSessions: task.sessions.length,
+                    fullyContainedSessions: [],
+                    overlappingSessions: [],
+                    excludedSessions: []
+                };
+                
+                task.sessions.forEach(session => {
+                    const sessionStart = session[0];
+                    const sessionEnd = session[1];
+                    
+                    if (sessionStart >= dateTimeRange.start.getTime() / 1000 && 
+                        sessionEnd <= dateTimeRange.end.getTime() / 1000) {
+                        // Session fully contained in range
+                        taskAnalysis.fullyContainedSessions.push(session);
+                        analysis.fullyContainedSessions++;
+                    } else if (sessionStart < dateTimeRange.end.getTime() / 1000 && 
+                              sessionEnd > dateTimeRange.start.getTime() / 1000) {
+                        // Session overlaps with range boundaries
+                        taskAnalysis.overlappingSessions.push(session);
+                        analysis.overlappingSessions++;
+                        analysis.hasOverlappingSessions = true;
+                    } else {
+                        // Session completely outside range
+                        taskAnalysis.excludedSessions.push(session);
+                    }
+                });
+                
+                const totalSessionsAfterCrop = taskAnalysis.fullyContainedSessions.length + taskAnalysis.overlappingSessions.length;
+                
+                if (totalSessionsAfterCrop > 0) {
+                    analysis.tasksWithSessionsInRange++;
+                    analysis.croppedTasks.push(taskAnalysis);
+                } else {
+                    analysis.excludedTasks.push(task.name);
+                }
+            });
+            
+            return analysis;
+        }
+        
+        function showCropConfirmationDialog(analysis) {
+            const modal = document.getElementById('cropModal');
+            const modalBody = document.getElementById('cropModalBody');
+            const confirmButton = document.getElementById('cropConfirmButton');
+            
+            let html = `
+                <p><strong>Crop Analysis Summary:</strong></p>
+                <ul>
+                    <li>Total tasks: ${analysis.totalTasks}</li>
+                    <li>Tasks with sessions in range: ${analysis.tasksWithSessionsInRange}</li>
+                    <li>Fully contained sessions: ${analysis.fullyContainedSessions}</li>
+                    <li><strong>Overlapping sessions: ${analysis.overlappingSessions}</strong></li>
+                </ul>
+            `;
+            
+            if (analysis.overlappingSessions > 0) {
+                html += `
+                    <p><strong>⚠️ Warning:</strong> ${analysis.overlappingSessions} session(s) overlap with the crop boundaries and will be truncated.</p>
+                    <p>Tasks that will be completely excluded:</p>
+                    <ul>
+                `;
+                analysis.excludedTasks.forEach(taskName => {
+                    html += `<li>${taskName}</li>`;
+                });
+                html += `</ul>`;
+            }
+            
+            html += `<p>Do you want to proceed with cropping the data?</p>`;
+            
+            modalBody.innerHTML = html;
+            modal.style.display = 'block';
+            
+            // Update confirm button to handle the crop
+            confirmButton.onclick = function() {
+                closeCropModal();
+                performCrop(analysis);
+            };
+        }
+        
+        function closeCropModal() {
+            document.getElementById('cropModal').style.display = 'none';
+        }
+        
+        function performCrop(analysis) {
+            console.log('Performing crop with analysis:', analysis);
+            
+            const croppedData = {
+                version: timerData.version,
+                value: []
+            };
+            
+            analysis.croppedTasks.forEach(taskAnalysis => {
+                const croppedTask = {
+                    name: taskAnalysis.name,
+                    sessions: [],
+                    state: 0 // Default to active state
+                };
+                
+                // Add fully contained sessions
+                taskAnalysis.fullyContainedSessions.forEach(session => {
+                    croppedTask.sessions.push(session);
+                });
+                
+                // Add truncated overlapping sessions
+                taskAnalysis.overlappingSessions.forEach(session => {
+                    const sessionStart = session[0];
+                    const sessionEnd = session[1];
+                    const rangeStart = currentDateTimeRange.start.getTime() / 1000;
+                    const rangeEnd = currentDateTimeRange.end.getTime() / 1000;
+                    
+                    const truncatedStart = Math.max(sessionStart, rangeStart);
+                    const truncatedEnd = Math.min(sessionEnd, rangeEnd);
+                    
+                    croppedTask.sessions.push([truncatedStart, truncatedEnd]);
+                });
+                
+                // Find original task to preserve state
+                const originalTask = timerData.value.find(task => task.name === taskAnalysis.name);
+                if (originalTask) {
+                    croppedTask.state = originalTask.state;
+                }
+                
+                croppedData.value.push(croppedTask);
+            });
+            
+            console.log('Cropped data generated:', croppedData);
+            
+            // Generate and download the cropped JSON
+            downloadCroppedData(croppedData);
+        }
+        
+        function downloadCroppedData(croppedData) {
+            const jsonString = JSON.stringify(croppedData, null, 2);
+            const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD format
+            const fileName = `timer-data-cropped-${timestamp}.json`;
+            
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            URL.revokeObjectURL(url);
+            
+            alert(`Cropped data saved as ${fileName}\n\nOriginal tasks: ${timerData.value.length}\nCropped tasks: ${croppedData.value.length}`);
+        }
+        
+          
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('cropModal');
+            if (event.target === modal) {
+                closeCropModal();
+            }
+        };
     </script>
 </body>
 </html>
