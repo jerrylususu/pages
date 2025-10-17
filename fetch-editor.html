@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fetch Request Editor</title>
     <style>
+        /* Layout and Container */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -47,7 +48,8 @@
             padding: 20px;
         }
 
-        .input-section, .output-section {
+        /* Section Styles */
+        .input-section, .editor-section, .output-section {
             background: #f8f9fa;
             border-radius: 6px;
             padding: 20px;
@@ -60,6 +62,7 @@
             color: #2c3e50;
         }
 
+      /* Form Elements */
         textarea {
             width: 100%;
             min-height: 200px;
@@ -90,6 +93,7 @@
             font-size: 14px;
         }
 
+      /* Buttons */
         .button-group {
             display: flex;
             gap: 10px;
@@ -134,6 +138,7 @@
             background: #229954;
         }
 
+        /* Notifications */
         .notification {
             position: fixed;
             top: 20px;
@@ -161,6 +166,7 @@
             background: #e74c3c;
         }
 
+       /* Collapsible Elements */
         .collapsible {
             background: #f1f1f1;
             color: #333;
@@ -203,6 +209,7 @@
             transition: max-height 0.5s ease-in;
         }
 
+        /* Editor Components */
         .editor-fields {
             background: white;
             border-radius: 4px;
@@ -258,6 +265,7 @@
             background: #229954;
         }
 
+        /* Resizable Editors */
         .resizable-editor {
             position: relative;
             border: 1px solid #ddd;
@@ -284,6 +292,7 @@
             background: linear-gradient(135deg, transparent 50%, #999 50%);
         }
 
+        /* Form Controls */
         .checkbox-group {
             display: flex;
             gap: 20px;
@@ -309,6 +318,55 @@
             width: 16px;
             height: 16px;
             cursor: pointer;
+            vertical-align: top;
+            margin-top: 2px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 5px;
+            flex-wrap: wrap;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+            color: #555;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .radio-label:hover {
+            color: #333;
+        }
+
+        .radio-label input[type="radio"] {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            vertical-align: top;
+            margin-top: 2px;
+        }
+
+        .explanatory-text {
+            display: block;
+            color: #666;
+            font-weight: normal;
+            font-size: 12px;
+            line-height: 1.4;
+            margin-top: 3px;
+        }
+
+        .form-explanation {
+            display: block;
+            color: #666;
+            font-weight: normal;
+            font-size: 12px;
+            line-height: 1.4;
+            margin-bottom: 8px;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
@@ -335,66 +393,94 @@
                 <div class="button-group">
                     <button class="btn-primary" onclick="parseFetchRequest()">Parse Request</button>
                     <button class="btn-secondary" onclick="clearInput()">Clear</button>
+                    <button class="btn-secondary" onclick="loadExample()">Load Example</button>
+                </div>
+            </div>
+
+            <div class="editor-section" id="editorSection" style="display: none;">
+                <h2 class="section-title">Edit Request</h2>
+                
+                <div class="form-group">
+                    <label for="methodSelect">Method:</label>
+                    <select id="methodSelect">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="HEAD">HEAD</option>
+                        <option value="OPTIONS">OPTIONS</option>
+                    </select>
                 </div>
 
-                <div class="editor-fields" id="editorFields" style="display: none;">
-                    <h3 class="section-title">Edit Request</h3>
-                    
-                    <div class="form-group">
-                        <label for="methodSelect">Method:</label>
-                        <select id="methodSelect">
-                            <option value="GET">GET</option>
-                            <option value="POST">POST</option>
-                            <option value="PUT">PUT</option>
-                            <option value="DELETE">DELETE</option>
-                            <option value="PATCH">PATCH</option>
-                            <option value="HEAD">HEAD</option>
-                            <option value="OPTIONS">OPTIONS</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label for="urlInput">URL:</label>
+                    <input type="text" id="urlInput" placeholder="https://api.example.com/endpoint">
+                </div>
 
-                    <div class="form-group">
-                        <label for="urlInput">URL:</label>
-                        <input type="text" id="urlInput" placeholder="https://api.example.com/endpoint">
-                    </div>
-
-                    <div class="form-group">
-                        <button class="collapsible" onclick="toggleHeaders()">Headers</button>
-                        <div class="collapsible-content" id="headersContainer">
-                            <div class="headers-editor" id="headersEditor">
-                                <div class="header-row">
-                                    <input type="text" placeholder="Header name" class="header-name">
-                                    <input type="text" placeholder="Header value" class="header-value">
-                                    <button class="btn-remove" onclick="removeHeaderRow(this)">Remove</button>
-                                </div>
+                <div class="form-group">
+                    <button class="collapsible" onclick="toggleHeaders()">Headers</button>
+                    <div class="collapsible-content" id="headersContainer">
+                        <div class="headers-editor" id="headersEditor">
+                            <div class="header-row">
+                                <input type="text" placeholder="Header name" class="header-name">
+                                <input type="text" placeholder="Header value" class="header-value">
+                                <button class="btn-remove" onclick="removeHeaderRow(this)">Remove</button>
                             </div>
-                            <button class="btn-add" onclick="addHeaderRow()">Add Header</button>
                         </div>
+                        <button class="btn-add" onclick="addHeaderRow()">Add Header</button>
                     </div>
+                </div>
 
-                    <div class="form-group">
-                        <label for="bodyInput">Body (JSON):</label>
-                        <div class="resizable-editor" style="height: 150px;">
-                            <div id="bodyInput"></div>
-                            <div class="resize-handle" data-target="bodyInput"></div>
+                <div class="form-group">
+                    <label for="bodyInput">Body (JSON):</label>
+                    <div class="resizable-editor" style="height: 150px;">
+                        <div id="bodyInput"></div>
+                        <div class="resize-handle" data-target="bodyInput"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Response Handling:</label>
+                    <small class="form-explanation">Choose how to parse the response body</small>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="responseType" value="json" checked>
+                            <div>
+                                <div>JSON (response.json())</div>
+                                <small class="explanatory-text">Parse response as JSON object</small>
+                            </div>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="responseType" value="text">
+                            <div>
+                                <div>Text (response.text())</div>
+                                <small class="explanatory-text">Parse response as plain text</small>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="collectResponses">
+                        <div>
+                            <div>Collect requests/responses</div>
+                            <small class="explanatory-text">Store multiple requests/responses in an array for batch processing</small>
                         </div>
-                    </div>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableConsoleSave">
+                        <div>
+                            <div>Enable console.save</div>
+                            <small class="explanatory-text">Add console.save() function to download data as JSON files</small>
+                        </div>
+                    </label>
+                </div>
 
-                    <div class="button-group">
-                        <button class="btn-primary" onclick="generateCode()">Generate Code</button>
-                        <button class="btn-secondary" onclick="resetEditor()">Reset</button>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="collectResponses">
-                            Collect requests/responses
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="enableConsoleSave">
-                            Enable console.save
-                        </label>
-                    </div>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="generateCode()">Generate Code</button>
+                    <button class="btn-secondary" onclick="resetEditor()">Reset</button>
                 </div>
             </div>
 
@@ -521,6 +607,7 @@
                         resize: vertical;
                         background: white;
                     `;
+                    
                     container.innerHTML = '';
                     container.appendChild(textarea);
                     container.classList.add('fallback-active');
@@ -643,7 +730,7 @@
                 }
 
                 populateEditor();
-                document.getElementById('editorFields').style.display = 'block';
+                document.getElementById('editorSection').style.display = 'block';
                 showNotification('Request parsed successfully!');
             } catch (error) {
                 showNotification('Failed to parse fetch request: ' + error.message, 'error');
@@ -712,7 +799,18 @@
         function populateEditor() {
             document.getElementById('methodSelect').value = currentRequest.method;
             document.getElementById('urlInput').value = currentRequest.url;
-            bodyEditor.setValue(currentRequest.body);
+            
+            // Set language based on whether body is valid JSON
+            if (!fallbackMode) {
+                const isJSON = isValidJSON(currentRequest.body);
+                const language = isJSON ? 'json' : 'plaintext';
+                
+                // Create new model with appropriate language
+                const model = monaco.editor.createModel(currentRequest.body, language);
+                bodyEditor.setModel(model);
+            } else {
+                bodyEditor.setValue(currentRequest.body);
+            }
 
             // Clear and populate headers
             const headersEditor = document.getElementById('headersEditor');
@@ -772,6 +870,18 @@
             return div.textContent || div.innerText || '';
         }
 
+        function isValidJSON(str) {
+            if (!str || str.trim() === '') {
+                return false;
+            }
+            try {
+                JSON.parse(str);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
         function generateCode() {
             try {
                 // Collect form data
@@ -802,6 +912,9 @@
             // Get checkbox states
             const collectMode = document.getElementById('collectResponses').checked;
             const saveMode = document.getElementById('enableConsoleSave').checked;
+            
+            // Get response type selection
+            const responseType = document.querySelector('input[name="responseType"]:checked').value;
             
             let baseCode = '';
             let setupCode = '';
@@ -843,7 +956,7 @@
                     const parsedBody = JSON.parse(currentRequest.body);
                     // If it's valid JSON, use the formatted version
                     fetchCode += `,
-  body: ${JSON.stringify(parsedBody, null, 6)}`;
+  body: JSON.stringify(${JSON.stringify(parsedBody, null, 4)})`;
                 } catch (e) {
                     // If it's not valid JSON, use as string
                     fetchCode += `,
@@ -867,7 +980,7 @@
                     hasBody = true;
                     try {
                         const parsedBody = JSON.parse(currentRequest.body);
-                        setupCode += `  const requestBody = ${JSON.stringify(parsedBody, null, 4)};\n`;
+                        setupCode += `  const requestBody = JSON.stringify(${JSON.stringify(parsedBody, null, 4)});\n`;
                     } catch (e) {
                         setupCode += `  const requestBody = ${JSON.stringify(currentRequest.body)};\n`;
                     }
@@ -911,7 +1024,7 @@
       throw new Error(\`HTTP error! status: \${response.status}\`);
     }
     
-    const data = await response.json();
+    const data = ${responseType === 'json' ? 'await response.json()' : 'await response.text()'};
     
     // Collect request/response data
     results.push({
@@ -930,7 +1043,7 @@
                 
                 if (saveMode) {
                     loopCode += `
-  console.save(results, 'responses.json');`;
+  // Use console.save(results, 'responses.json') to save results if needed;`;
                 }
                 
                 loopCode += `
@@ -945,24 +1058,34 @@
     throw new Error(\`HTTP error! status: \${response.status}\`);
   }
   
-  const data = await response.json();
+  const data = ${responseType === 'json' ? 'await response.json()' : 'await response.text()'};
   console.log('Response:', data);`;
                 
                 if (saveMode) {
+                    let bodyAssignment = 'undefined';
+                    if (currentRequest.body) {
+                        try {
+                            const parsedBody = JSON.parse(currentRequest.body);
+                            bodyAssignment = JSON.stringify(parsedBody, null, 4);
+                        } catch (e) {
+                            bodyAssignment = JSON.stringify(currentRequest.body);
+                        }
+                    }
+                    
                     loopCode += `
   
-  // Save response data
+  // Response data object available for saving
   const responseObj = {
     req: {
       url: '${currentRequest.url}',
-      body: ${currentRequest.body ? JSON.stringify(currentRequest.body) : 'undefined'}
+      body: ${bodyAssignment}
     },
     resp: {
       code: response.status,
       body: data
     }
   };
-  console.save(responseObj, 'response.json');`;
+  // Use console.save(responseObj, 'response.json') to save if needed;`;
                 }
             }
 
@@ -971,38 +1094,45 @@
   try {
 ${setupCode.split('\n').map(line => '    ' + line).join('\n')}
 ${loopCode}
+${collectMode ? '    return results;' : '    return data;'}
   } catch (error) {
     console.error('Request failed:', error);
   }
 }
 
-makeRequest();`;
+fetch_mod_resp = await makeRequest();`;
 
             return fullCode;
         }
 
         function getConsoleSaveCode() {
-            return `// Console.save implementation
-(function(console){
-  console.save = function(data, filename){
-    if(!data) {
-      console.error('Console.save: No data')
-      return;
+            return `// Console.save implementation (only injects if not already defined)
+if (typeof console.save === 'undefined') {
+  (function(console){
+    console.save = function(data, filename){
+      if(!data) {
+        console.error('Console.save: No data')
+        return;
+      }
+      if(!filename) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        filename = timestamp + '.json';
+      }
+      if(typeof data === "object"){
+        data = JSON.stringify(data, undefined, 4)
+      }
+      var blob = new Blob([data], {type: 'text/json'}),
+          e    = document.createEvent('MouseEvents'),
+          a    = document.createElement('a')
+      a.download = filename
+      a.href = window.URL.createObjectURL(blob)
+      a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+      e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+      a.dispatchEvent(e)
     }
-    if(!filename) filename = 'console.json'
-    if(typeof data === "object"){
-      data = JSON.stringify(data, undefined, 4)
-    }
-    var blob = new Blob([data], {type: 'text/json'}),
-        e    = document.createEvent('MouseEvents'),
-        a    = document.createElement('a')
-    a.download = filename
-    a.href = window.URL.createObjectURL(blob)
-    a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
-    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
-    a.dispatchEvent(e)
-  }
-})(console);`;
+  })(console);
+  console.log('console.save() is now available. Use console.save(obj, "filename.json") to save data.');
+}`;
         }
 
         function copyCode() {
@@ -1055,7 +1185,7 @@ makeRequest();`;
 
         function clearInput() {
             inputEditor.setValue('');
-            document.getElementById('editorFields').style.display = 'none';
+            document.getElementById('editorSection').style.display = 'none';
         }
 
         function clearOutput() {
@@ -1078,6 +1208,22 @@ makeRequest();`;
             const content = document.getElementById('headersContainer');
             coll.classList.toggle('active');
             content.classList.toggle('show');
+        }
+
+        function loadExample() {
+            const exampleContent = `fetch("http://localhost:8080/api", {
+  "headers": {
+    "accept": "*/*",
+    "accept-language": "zh-CN,zh;q=0.9",
+    "content-type": "application/json"
+  },
+  "body": "{\\"text\\":\\"11\\",\\"message\\":\\"222\\",\\"number\\":111,\\"option1\\":true,\\"option2\\":false}",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});`;
+            inputEditor.setValue(exampleContent);
+            showNotification('Example loaded!');
         }
 
         // Initialize with one empty header row
