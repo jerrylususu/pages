@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Prompt Templater</title>
+    <title>LLM Prompt Templater v2.1</title>
     <style>
         :root {
             --bg-primary: #ffffff;
@@ -38,9 +38,7 @@
             --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.4), 0 6px 6px rgba(0, 0, 0, 0.5);
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             font-family: var(--font-family);
@@ -124,7 +122,7 @@
             padding-bottom: 1rem;
             margin-bottom: 1rem;
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
         }
 
@@ -135,9 +133,7 @@
             color: var(--text-primary);
         }
 
-        .form-group {
-            margin-bottom: 1rem;
-        }
+        .form-group { margin-bottom: 1rem; }
 
         .form-label {
             display: block;
@@ -204,25 +200,13 @@
             border: 1px solid var(--border-color);
         }
 
-        .btn-secondary:hover {
-            background: var(--border-color);
-        }
+        .btn-secondary:hover { background: var(--border-color); }
 
-        .btn-danger {
-            background: var(--danger);
-        }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #c82333; }
 
-        .btn-danger:hover {
-            background: #c82333;
-        }
-
-        .btn-success {
-            background: var(--success);
-        }
-
-        .btn-success:hover {
-            background: #157347;
-        }
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #157347; }
 
         .btn-sm {
             padding: 0.5rem 1rem;
@@ -241,9 +225,7 @@
             transition: background-color 0.3s ease;
         }
 
-        .prompt-item:hover {
-            background: var(--bg-tertiary);
-        }
+        .prompt-item:hover { background: var(--bg-tertiary); }
 
         .prompt-item input {
             flex: 1;
@@ -253,9 +235,7 @@
             font-size: 0.9rem;
         }
 
-        .prompt-item input:focus {
-            outline: none;
-        }
+        .prompt-item input:focus { outline: none; }
 
         .prompt-part {
             border: 1px solid var(--border-color);
@@ -277,8 +257,7 @@
 
         .output-container {
             min-height: 200px;
-            max-height: 600px;
-            overflow-y: auto;
+            height: auto;
             padding: 1rem;
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
@@ -310,6 +289,8 @@
             border: 1px solid var(--border-color);
             border-radius: var(--border-radius);
             font-size: 0.9rem;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         .status-indicator {
@@ -319,23 +300,33 @@
             font-weight: 500;
         }
 
-        .status-indicator.processing {
-            color: var(--warning);
-        }
-
-        .status-indicator.success {
-            color: var(--success);
-        }
-
-        .status-indicator.error {
-            color: var(--danger);
-        }
+        .status-indicator.processing { color: var(--warning); }
+        .status-indicator.success { color: var(--success); }
+        .status-indicator.error { color: var(--danger); }
 
         .counter {
             color: var(--text-secondary);
             font-size: 0.8rem;
             font-family: var(--font-mono);
         }
+
+        .stats-group {
+            display: flex;
+            gap: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        
+        .stat-label { font-weight: 600; color: var(--text-muted); }
+        .stat-value { color: var(--text-primary); font-weight: 600; }
 
         .spinner {
             display: inline-block;
@@ -347,46 +338,64 @@
             animation: spin 1s ease-in-out infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .input-section, .output-section {
             margin-bottom: 2rem;
             margin-top: 2rem;
         }
 
-        .full-width {
-            grid-column: 1 / -1;
+        .collapsible-container {
+            margin-bottom: 1.5rem;
         }
 
-        .settings-grid {
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: 0.5rem 0;
+            user-select: none;
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-bottom: 1px solid transparent;
+            transition: color 0.2s;
+        }
+
+        .collapsible-header:hover {
+            color: var(--accent);
+        }
+
+        .collapsible-content {
+            display: none;
+            margin-top: 1rem;
+            animation: slideDown 0.3s ease-out forwards;
+        }
+
+        .collapsible-content.active {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .arrow-icon {
+            display: inline-block;
+            transition: transform 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .collapsible-header.active .arrow-icon {
+            transform: rotate(180deg);
         }
 
         @media (max-width: 768px) {
-            .grid-2, .settings-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .main-container {
-                padding: 1rem;
-            }
-            
-            .header {
-                padding: 1rem;
-            }
+            .grid-2 { grid-template-columns: 1fr; }
+            .main-container { padding: 1rem; }
+            .header { padding: 1rem; }
+            .stats-group { flex-direction: column; gap: 0.5rem; }
         }
     </style>
 </head>
@@ -400,38 +409,45 @@
     </header>
 
     <div class="main-container">
-        <div class="grid grid-2">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Configuration</h3>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Base URL</label>
-                    <input type="text" id="baseUrl" class="form-control" placeholder="https://api.openai.com/v1" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Model Name</label>
-                    <input type="text" id="modelName" class="form-control" placeholder="gpt-3.5-turbo" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">API Key</label>
-                    <input type="password" id="apiKey" class="form-control" placeholder="sk-..." />
-                </div>
-                <button class="btn btn-success" onclick="saveSettings()">
-                    💾 Save Settings
-                </button>
+        <div class="collapsible-container">
+            <div class="collapsible-header" onclick="toggleSettings()" id="settingsHeader">
+                <span class="arrow-icon">▼</span>
+                <span>Settings & Prompts Management</span>
             </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Prompts Management</h3>
-                </div>
-                <div style="margin-bottom: 1rem;">
-                    <button class="btn" onclick="addPrompt()">
-                        ➕ Add New Prompt
+            
+            <div class="collapsible-content grid grid-2" id="settingsContent">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Configuration</h3>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Base URL</label>
+                        <input type="text" id="baseUrl" class="form-control" placeholder="https://api.openai.com/v1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Model Name</label>
+                        <input type="text" id="modelName" class="form-control" placeholder="gpt-3.5-turbo" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">API Key</label>
+                        <input type="password" id="apiKey" class="form-control" placeholder="sk-..." />
+                    </div>
+                    <button class="btn btn-success" onclick="saveSettings()">
+                        💾 Save Settings
                     </button>
                 </div>
-                <div id="promptsList"></div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Prompts Management</h3>
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <button class="btn" onclick="addPrompt()">
+                            ➕ Add New Prompt
+                        </button>
+                    </div>
+                    <div id="promptsList"></div>
+                </div>
             </div>
         </div>
 
@@ -504,7 +520,25 @@
                             <span class="spinner"></span>
                             <span id="statusText">Initializing...</span>
                         </div>
-                        <div class="counter" id="elapsedTime">0s</div>
+                        
+                        <div class="stats-group" id="statsGroup">
+                            <div class="stat-item" title="Total Request Time">
+                                <span class="stat-label">Total:</span>
+                                <span class="stat-value" id="statTotalTime">0ms</span>
+                            </div>
+                            <div class="stat-item" title="Time to First Token">
+                                <span class="stat-label">TTFT:</span>
+                                <span class="stat-value" id="statTTFT">--</span>
+                            </div>
+                             <div class="stat-item" title="Generation Time (First token to End)">
+                                <span class="stat-label">Gen Time:</span>
+                                <span class="stat-value" id="statGenTime">--</span>
+                            </div>
+                            <div class="stat-item" title="Generation Speed (Chars/sec)">
+                                <span class="stat-label">Speed:</span>
+                                <span class="stat-value" id="statSpeed">--</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -521,10 +555,16 @@
         let currentPrompt = null;
         let isStreaming = false;
         let currentResponse = '';
+        
+        // Timing state
         let startTime = null;
+        let firstTokenTime = null;
         let elapsedInterval = null;
+        
+        // UI State
         let isEditMode = false;
         let isPromptExpanded = false;
+        let isSettingsExpanded = false;
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
@@ -565,6 +605,22 @@
             }
         }
 
+        // Toggle Settings Section
+        function toggleSettings() {
+            const content = document.getElementById('settingsContent');
+            const header = document.getElementById('settingsHeader');
+            
+            isSettingsExpanded = !isSettingsExpanded;
+            
+            if (isSettingsExpanded) {
+                content.classList.add('active');
+                header.classList.add('active');
+            } else {
+                content.classList.remove('active');
+                header.classList.remove('active');
+            }
+        }
+
         // Settings management
         function saveSettings() {
             const settings = {
@@ -574,7 +630,6 @@
             };
             localStorage.setItem('llm_settings', JSON.stringify(settings));
             
-            // Show success message
             showStatus('Settings saved successfully!', 'success');
             setTimeout(() => hideStatus(), 2000);
         }
@@ -641,6 +696,7 @@
 
             document.getElementById('promptSelect').value = id;
             updatePromptDisplay();
+            if (!isPromptExpanded) togglePromptDisplay();
         }
 
         function deletePrompt(id) {
@@ -701,7 +757,6 @@
                     display.style.display = 'block';
                     editBtn.style.display = 'inline-flex';
                     
-                    // Reset to view mode
                     isEditMode = false;
                     isPromptExpanded = false;
                     setViewMode();
@@ -751,6 +806,7 @@
                 btn.textContent = '💾 Save Changes';
                 note.style.display = 'block';
                 isEditMode = true;
+                if (!isPromptExpanded) togglePromptDisplay();
             }
         }
         
@@ -766,7 +822,6 @@
             afterSubtitle.readOnly = false;
             afterSubtitle.disabled = false;
             
-            // Add real-time saving
             systemPrompt.oninput = () => savePromptContent(currentPrompt.id);
             beforeSubtitle.oninput = () => savePromptContent(currentPrompt.id);
             afterSubtitle.oninput = () => savePromptContent(currentPrompt.id);
@@ -784,7 +839,6 @@
             afterSubtitle.readOnly = true;
             afterSubtitle.disabled = true;
             
-            // Remove event listeners
             systemPrompt.oninput = null;
             beforeSubtitle.oninput = null;
             afterSubtitle.oninput = null;
@@ -801,7 +855,7 @@
             savePrompts();
         }
 
-        // Status management
+        // Status and Stats management
         function showStatus(text, type = 'processing') {
             const statusBar = document.getElementById('statusBar');
             const statusIndicator = document.getElementById('statusIndicator');
@@ -810,31 +864,63 @@
             statusIndicator.className = `status-indicator ${type}`;
             statusText.textContent = text;
             statusBar.style.display = 'block';
+
+            const spinner = statusIndicator.querySelector('.spinner');
+            if (type === 'processing') {
+                spinner.style.display = 'inline-block';
+            } else {
+                spinner.style.display = 'none';
+            }
         }
 
         function hideStatus() {
-            document.getElementById('statusBar').style.display = 'none';
+            // Stats remain visible
         }
 
-        function updateElapsedTime() {
+        function resetStats() {
+            document.getElementById('statTTFT').textContent = '--';
+            document.getElementById('statTotalTime').textContent = '0ms';
+            document.getElementById('statGenTime').textContent = '--';
+            document.getElementById('statSpeed').textContent = '--';
+            startTime = null;
+            firstTokenTime = null;
+        }
+
+        function updateStatsLoop() {
             if (!startTime) return;
+            const now = Date.now();
             
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            document.getElementById('elapsedTime').textContent = `${elapsed}s`;
+            // Update Total Time (in ms)
+            const totalElapsed = now - startTime;
+            document.getElementById('statTotalTime').textContent = `${totalElapsed}ms`;
+
+            // If we have received the first token, we can calculate generation stats
+            if (firstTokenTime && currentResponse.length > 0) {
+                // Update Generation Time (now - firstTokenTime) in ms
+                const genTime = now - firstTokenTime;
+                document.getElementById('statGenTime').textContent = `${genTime}ms`;
+
+                // Update Speed (Chars / Second)
+                // Denominator is Generation Time
+                if (genTime > 0) {
+                    const speed = (currentResponse.length / (genTime / 1000)).toFixed(1);
+                    document.getElementById('statSpeed').textContent = `${speed} chars/s`;
+                }
+            }
         }
 
-        function startElapsedTimer() {
+        function startStatsTimer() {
             startTime = Date.now();
-            updateElapsedTime();
-            elapsedInterval = setInterval(updateElapsedTime, 1000);
+            firstTokenTime = null;
+            elapsedInterval = setInterval(updateStatsLoop, 50); // Update frequently (50ms)
         }
 
-        function stopElapsedTimer() {
+        function stopStatsTimer() {
             if (elapsedInterval) {
                 clearInterval(elapsedInterval);
                 elapsedInterval = null;
             }
-            startTime = null;
+            updateStatsLoop();
         }
 
         // Counter functions
@@ -861,50 +947,49 @@
             const subtitle = document.getElementById('subtitle').value.trim();
             if (!subtitle) {
                 showStatus('Please paste your input text first.', 'error');
-                setTimeout(() => hideStatus(), 3000);
+                setTimeout(() => document.getElementById('statusBar').style.display = 'none', 3000);
                 return;
             }
             
             if (!currentPrompt) {
                 showStatus('Please select a prompt first.', 'error');
-                setTimeout(() => hideStatus(), 3000);
+                setTimeout(() => document.getElementById('statusBar').style.display = 'none', 3000);
                 return;
             }
             
             const settings = JSON.parse(localStorage.getItem('llm_settings') || '{}');
             if (!settings.apiKey) {
                 showStatus('Please configure your API key in settings.', 'error');
-                setTimeout(() => hideStatus(), 3000);
+                if (!isSettingsExpanded) toggleSettings();
                 return;
             }
             
-            // Prepare input text (remove newlines)
             const cleanSubtitle = subtitle.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
             
-            // Prepare messages
             const messages = [
                 { role: 'system', content: currentPrompt.system },
                 { role: 'user', content: currentPrompt.before + cleanSubtitle + currentPrompt.after }
             ];
             
-            // Start streaming
             isStreaming = true;
             currentResponse = '';
             
-            // Update UI
+            // UI Updates
             document.getElementById('processBtn').textContent = 'Processing...';
             document.getElementById('processBtn').disabled = true;
             document.getElementById('output').innerHTML = '';
             document.getElementById('exportBtn').style.display = 'none';
             document.getElementById('outputCounter').style.display = 'none';
             
-            // Show status and start timer
-            showStatus('Request sent, waiting for response...', 'processing');
-            startElapsedTimer();
+            if (isSettingsExpanded) toggleSettings();
+
+            resetStats();
+            showStatus('Request initiated...', 'processing');
+            startStatsTimer();
             
             try {
                 await streamResponse(messages, settings);
-                showStatus('Finished successfully!', 'success');
+                showStatus('Finished successfully', 'success');
                 updateOutputCounter();
             } catch (error) {
                 console.error('Error:', error);
@@ -912,20 +997,15 @@
                 document.getElementById('output').innerHTML = `<p style="color: var(--danger);">Error: ${error.message}</p>`;
             } finally {
                 isStreaming = false;
-                stopElapsedTimer();
+                stopStatsTimer();
                 document.getElementById('processBtn').textContent = '🚀 Process';
                 document.getElementById('processBtn').disabled = false;
                 document.getElementById('exportBtn').style.display = 'inline-flex';
-                
-                setTimeout(() => hideStatus(), 3000);
             }
         }
 
         async function streamResponse(messages, settings) {
             const url = settings.baseUrl + '/chat/completions';
-            
-            // Update status to streaming
-            showStatus('Streaming response...', 'processing');
             
             const response = await fetch(url, {
                 method: 'POST',
@@ -963,10 +1043,19 @@
                         try {
                             const parsed = JSON.parse(data);
                             const content = parsed.choices?.[0]?.delta?.content;
+                            
                             if (content) {
+                                // Record TTFT on first content chunk
+                                if (!firstTokenTime) {
+                                    firstTokenTime = Date.now();
+                                    const ttft = firstTokenTime - startTime;
+                                    document.getElementById('statTTFT').textContent = `${ttft}ms`;
+                                    document.getElementById('statusText').textContent = 'Streaming...';
+                                }
+
                                 currentResponse += content;
                                 updateOutput();
-                                updateOutputCounter(); // Update counter as streaming continues
+                                updateOutputCounter();
                             }
                         } catch (e) {
                             console.warn('Failed to parse chunk:', data);
@@ -978,12 +1067,12 @@
 
         function updateOutput() {
             const output = document.getElementById('output');
-            output.innerHTML = marked.parse(currentResponse);
-            
-            // Highlight code blocks
-            output.querySelectorAll('pre code').forEach((block) => {
-                hljs.highlightElement(block);
-            });
+            if (currentResponse) {
+                output.innerHTML = marked.parse(currentResponse);
+                output.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
         }
 
         function exportMarkdown() {
@@ -993,7 +1082,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `llm-prompt-templater-${new Date().toISOString().split('T')[0]}.md`;
+            a.download = `llm-response-${new Date().toISOString().slice(0,10)}.md`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
