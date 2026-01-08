@@ -434,6 +434,46 @@
         .modal-button-confirm:hover {
             background: var(--button-success-hover);
         }
+
+        .performance-warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .performance-warning.show {
+            display: block;
+        }
+
+        .performance-warning h4 {
+            margin: 0 0 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .performance-warning p {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+
+        .performance-warning button {
+            background: var(--button-primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .performance-warning button:hover {
+            background: var(--button-primary-hover);
+        }
     </style>
 </head>
 <body>
@@ -478,6 +518,11 @@
         </div>
         
         <div id="chartWrapper" style="display: none;">
+            <div id="performanceWarning" class="performance-warning">
+                <h4>⚠️ Large Dataset Detected</h4>
+                <p id="performanceWarningText">This dataset contains more than 50 sessions. Rendering all sessions at once may cause the page to become slow or unresponsive.</p>
+                <button onclick="renderVisualization()">Dismiss</button>
+            </div>
             <div class="chart-container">
                 <div id="timerChart"></div>
             </div>
@@ -513,6 +558,9 @@
     <script>
         let timerData = null;
         let currentDateTimeRange = null;
+        let totalSessionCount = 0;
+        const SESSION_THRESHOLD = 50;
+        let hasRendered = false;
         
         // Theme management
         function initTheme() {
@@ -569,24 +617,36 @@
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
+
             console.log('Selected file:', file.name, file.type, file.size);
-            
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 console.log('File content length:', e.target.result.length);
                 console.log('First 500 chars:', e.target.result.substring(0, 500));
-                
+
                 try {
                     timerData = JSON.parse(e.target.result);
                     console.log('Successfully parsed JSON:', timerData);
-                    
+
                     // Process ongoing sessions (null end times)
                     processOngoingSessions(timerData);
-                    
+
+                    // Count total sessions
+                    totalSessionCount = timerData.value.reduce((sum, task) => sum + task.sessions.length, 0);
+                    console.log('Total session count:', totalSessionCount);
+
                     document.getElementById('noDataMessage').style.display = 'none';
                     document.getElementById('chartWrapper').style.display = 'block';
-                    updateVisualization();
+                    hasRendered = false;
+
+                    // Check if we need to show performance warning
+                    if (totalSessionCount > SESSION_THRESHOLD) {
+                        showPerformanceWarning();
+                    } else {
+                        // Auto-render if under threshold
+                        updateVisualization();
+                    }
                 } catch (error) {
                     console.error('JSON parsing error:', error);
                     console.error('Error message:', error.message);
@@ -621,17 +681,40 @@
                 console.log(`Processed ${processedSessions} ongoing sessions using current timestamp: ${new Date(currentTimestamp * 1000).toLocaleString()}`);
             }
         }
+
+        function showPerformanceWarning() {
+            const warningEl = document.getElementById('performanceWarning');
+            const warningTextEl = document.getElementById('performanceWarningText');
+            warningTextEl.textContent = `This dataset contains ${totalSessionCount} sessions (more than ${SESSION_THRESHOLD}). Rendering all sessions at once may cause the page to become slow or unresponsive. Please manually select a time range first, then click "Render Now".`;
+            warningEl.classList.add('show');
+            hasRendered = false;
+        }
+
+        function hidePerformanceWarning() {
+            document.getElementById('performanceWarning').classList.remove('show');
+        }
+
+        function renderVisualization() {
+            hidePerformanceWarning();
+            hasRendered = true;
+            updateVisualization();
+        }
         
         function applyDateTimeRange() {
             const startDateTime = document.getElementById('startDateTime').value;
             const endDateTime = document.getElementById('endDateTime').value;
-            
+
             if (startDateTime && endDateTime) {
                 currentDateTimeRange = {
                     start: new Date(startDateTime),
                     end: new Date(endDateTime)
                 };
-                updateVisualization();
+                // If warning is shown, dismiss it and render
+                if (document.getElementById('performanceWarning').classList.contains('show')) {
+                    renderVisualization();
+                } else {
+                    updateVisualization();
+                }
             }
         }
         
@@ -1148,13 +1231,18 @@
         function applyDateTimeRange() {
             const startDateTime = document.getElementById('startDateTime').value;
             const endDateTime = document.getElementById('endDateTime').value;
-            
+
             if (startDateTime && endDateTime) {
                 currentDateTimeRange = {
                     start: new Date(startDateTime),
                     end: new Date(endDateTime)
                 };
-                updateVisualization();
+                // If warning is shown, dismiss it and render
+                if (document.getElementById('performanceWarning').classList.contains('show')) {
+                    renderVisualization();
+                } else {
+                    updateVisualization();
+                }
             }
         }
         
