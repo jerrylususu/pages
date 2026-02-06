@@ -253,6 +253,47 @@
         .task-list {
             margin-top: 30px;
         }
+
+        .markdown-table {
+            margin-top: 30px;
+        }
+
+        .markdown-table details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            background: var(--bg-card);
+        }
+
+        .markdown-table summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .markdown-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 12px 0;
+            flex-wrap: wrap;
+        }
+
+        .markdown-copy-status {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .markdown-output {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 13px;
+            white-space: pre;
+            overflow-x: auto;
+        }
         
         .task-item {
             padding: 15px;
@@ -506,6 +547,7 @@
             <div class="day-navigation">
                 <button onclick="navigateToPreviousDay()">← Prev Day</button>
                 <button onclick="navigateToToday()">Today</button>
+                <button onclick="navigateToThisWeek()">This Week</button>
                 <button onclick="navigateToFullDay()">Full Day</button>
                 <button onclick="navigateToNextDay()">Next Day →</button>
             </div>
@@ -530,6 +572,17 @@
             <div class="stats" id="statsContainer"></div>
             
             <div class="task-list" id="taskList"></div>
+
+            <div class="markdown-table" id="markdownTableSection">
+                <details id="markdownDetails">
+                    <summary>Markdown Table (click to expand)</summary>
+                    <div class="markdown-actions">
+                        <button onclick="copyMarkdownTable()">Copy Markdown Table</button>
+                        <span class="markdown-copy-status" id="markdownCopyStatus"></span>
+                    </div>
+                    <pre id="markdownTableOutput" class="markdown-output"></pre>
+                </details>
+            </div>
         </div>
         
         <div id="noDataMessage" class="no-data">
@@ -640,6 +693,8 @@
                     document.getElementById('chartWrapper').style.display = 'block';
                     hasRendered = false;
 
+                    setThisWeekRange(false);
+
                     // Check if we need to show performance warning
                     if (totalSessionCount > SESSION_THRESHOLD) {
                         showPerformanceWarning();
@@ -724,7 +779,36 @@
             currentDateTimeRange = null;
             updateVisualization();
         }
-        
+
+        function navigateToThisWeek() {
+            setThisWeekRange(true);
+        }
+
+        function setThisWeekRange(shouldRender) {
+            const today = new Date();
+            const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+            const daysSinceMonday = (dayOfWeek + 6) % 7;
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - daysSinceMonday);
+            weekStart.setHours(0, 0, 0, 0);
+
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 5);
+            weekEnd.setHours(24, 0, 0, 0);
+
+            document.getElementById('startDateTime').value = formatDateTimeLocal(weekStart);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(weekEnd);
+
+            currentDateTimeRange = {
+                start: weekStart,
+                end: weekEnd
+            };
+
+            if (shouldRender) {
+                updateVisualization();
+            }
+        }
+
         function navigateToToday() {
             const currentStart = document.getElementById('startDateTime').value;
             const currentEnd = document.getElementById('endDateTime').value;
@@ -862,6 +946,7 @@
             updateChart(filteredData);
             updateStats(filteredData);
             updateTaskList(filteredData);
+            updateMarkdownTable(filteredData);
         }
         
         function filterDataByDateTime(data, dateTimeRange) {
@@ -1213,6 +1298,111 @@
                 <h3>Tasks</h3>
                 ${taskListHtml || '<p class="no-data">No tasks found for selected date</p>'}
             `;
+        }
+
+        function updateMarkdownTable(data) {
+            const outputEl = document.getElementById('markdownTableOutput');
+            const statusEl = document.getElementById('markdownCopyStatus');
+            if (statusEl) {
+                statusEl.textContent = '';
+            }
+
+            if (!data || data.value.length === 0) {
+                outputEl.textContent = '_No tasks found for selected date range._';
+                return;
+            }
+
+            const headers = [
+                'Task',
+                'Status',
+                'Sessions',
+                'Total (min)',
+                'Avg (min)',
+                'First Start',
+                'Last End'
+            ];
+            const separator = headers.map(() => '---');
+            const rows = data.value.map(task => {
+                const sessionCount = task.sessions.length;
+                const totalSeconds = task.sessions.reduce((sum, session) => sum + (session[1] - session[0]), 0);
+                const totalMinutes = totalSeconds / 60;
+                const avgMinutes = sessionCount > 0 ? totalMinutes / sessionCount : 0;
+                const starts = task.sessions.map(session => session[0]);
+                const ends = task.sessions.map(session => session[1]);
+                const firstStart = starts.length > 0 ? new Date(Math.min(...starts) * 1000).toLocaleString() : '-';
+                const lastEnd = ends.length > 0 ? new Date(Math.max(...ends) * 1000).toLocaleString() : '-';
+                const status = task.state === 0 ? 'Active' : task.state === 1 ? 'Finished' : 'Dropped';
+
+                return [
+                    escapeMarkdownCell(task.name),
+                    status,
+                    String(sessionCount),
+                    totalMinutes.toFixed(1),
+                    avgMinutes.toFixed(1),
+                    escapeMarkdownCell(firstStart),
+                    escapeMarkdownCell(lastEnd)
+                ];
+            });
+
+            const tableLines = [];
+            tableLines.push(`| ${headers.join(' | ')} |`);
+            tableLines.push(`| ${separator.join(' | ')} |`);
+            rows.forEach(row => {
+                tableLines.push(`| ${row.join(' | ')} |`);
+            });
+
+            outputEl.textContent = tableLines.join('\n');
+        }
+
+        function escapeMarkdownCell(value) {
+            if (value === null || value === undefined) return '';
+            return String(value).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+        }
+
+        function copyMarkdownTable() {
+            const outputEl = document.getElementById('markdownTableOutput');
+            const statusEl = document.getElementById('markdownCopyStatus');
+            const text = outputEl ? outputEl.textContent.trim() : '';
+
+            if (!text) {
+                if (statusEl) {
+                    statusEl.textContent = 'Nothing to copy';
+                }
+                return;
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    if (statusEl) {
+                        statusEl.textContent = 'Copied!';
+                    }
+                }).catch(() => {
+                    fallbackCopyText(text, statusEl);
+                });
+            } else {
+                fallbackCopyText(text, statusEl);
+            }
+        }
+
+        function fallbackCopyText(text, statusEl) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (statusEl) {
+                    statusEl.textContent = 'Copied!';
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.textContent = 'Copy failed';
+                }
+            }
+            document.body.removeChild(textArea);
         }
         
         function toggleTaskSessions(taskIndex) {
