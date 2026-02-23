@@ -378,6 +378,12 @@
         secret: "",
         messages: [],
         attemptCount: 0,
+        gameUsage: {
+          cachedInput: 0,
+          input: 0,
+          output: 0,
+          hasUsage: false
+        },
         abortController: null,
         currentReader: null,
         stopRequested: false,
@@ -595,6 +601,91 @@
         return `TTFT: ${formatMs(timing.ttftMs)} | Total: ${formatMs(timing.totalMs)}`;
       }
 
+      function toTokenNumber(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return null;
+        return Math.max(0, Math.round(n));
+      }
+
+      function createEmptyUsage() {
+        return {
+          cachedInput: 0,
+          input: 0,
+          output: 0,
+          hasUsage: false
+        };
+      }
+
+      function normalizeUsage(rawUsage) {
+        if (!rawUsage || typeof rawUsage !== "object") return null;
+        const promptTokens = toTokenNumber(rawUsage.prompt_tokens ?? rawUsage.input_tokens);
+        const completionTokens = toTokenNumber(rawUsage.completion_tokens ?? rawUsage.output_tokens);
+        const cachedFromPromptDetails = toTokenNumber(
+          rawUsage.prompt_tokens_details && rawUsage.prompt_tokens_details.cached_tokens
+        );
+        const cachedFromInputDetails = toTokenNumber(
+          rawUsage.input_tokens_details && rawUsage.input_tokens_details.cached_tokens
+        );
+        const cachedFromHit = toTokenNumber(rawUsage.prompt_cache_hit_tokens);
+        const promptMissTokens = toTokenNumber(rawUsage.prompt_cache_miss_tokens);
+        const cachedInputRaw = cachedFromPromptDetails ?? cachedFromInputDetails ?? cachedFromHit;
+        const cachedInput = cachedInputRaw ?? 0;
+
+        let input = 0;
+        if (promptMissTokens !== null) {
+          input = promptMissTokens;
+        } else if (promptTokens !== null) {
+          input = Math.max(0, promptTokens - cachedInput);
+        }
+
+        const output = completionTokens ?? 0;
+        const hasUsage =
+          promptTokens !== null ||
+          completionTokens !== null ||
+          cachedInputRaw !== null ||
+          promptMissTokens !== null;
+        if (!hasUsage) return null;
+
+        return {
+          cachedInput,
+          input,
+          output,
+          hasUsage: true
+        };
+      }
+
+      function addUsageTotals(target, usage) {
+        if (!target || !usage || !usage.hasUsage) return;
+        target.cachedInput += usage.cachedInput;
+        target.input += usage.input;
+        target.output += usage.output;
+        target.hasUsage = true;
+      }
+
+      function cloneUsage(usage) {
+        if (!usage) return null;
+        return {
+          cachedInput: usage.cachedInput,
+          input: usage.input,
+          output: usage.output,
+          hasUsage: Boolean(usage.hasUsage)
+        };
+      }
+
+      function formatUsage(usage) {
+        if (!usage || !usage.hasUsage) {
+          return "cached input n/a | input n/a | output n/a";
+        }
+        return `cached input ${usage.cachedInput} | input ${usage.input} | output ${usage.output}`;
+      }
+
+      function patternToEmoji(pattern) {
+        return String(pattern || "")
+          .split("")
+          .map((ch) => (ch === "G" ? "🟩" : ch === "Y" ? "🟨" : ch === "B" ? "⬛" : ch))
+          .join("");
+      }
+
       function historySummaryText() {
         return `Correct ${state.stats.correctGuesses} | Wrong ${state.stats.wrongGuesses}`;
       }
@@ -605,13 +696,14 @@
         return Math.min(2, Math.max(0, n));
       }
 
-      function renderAttempt(turn, guess, reason, pattern, valid, timing, historySummary, attemptUsed = true) {
+      function renderAttempt(turn, guess, reason, pattern, valid, timing, historySummary, tokenUsage, attemptUsed = true) {
         const li = document.createElement("li");
         const title = document.createElement("div");
         title.className = "attempt-title";
+        const patternDisplay = valid ? patternToEmoji(pattern) : pattern;
         title.textContent = attemptUsed
-          ? `Turn ${turn}: ${guess.toUpperCase()} (${pattern})`
-          : `Turn ${turn}: ${guess.toUpperCase()} (${pattern}, no attempt used)`;
+          ? `Turn ${turn}: ${guess.toUpperCase()} (${patternDisplay})`
+          : `Turn ${turn}: ${guess.toUpperCase()} (${patternDisplay}, no attempt used)`;
         const meta = document.createElement("p");
         meta.className = "attempt-meta";
         meta.textContent = `${valid ? "Reason" : "Rejected"}: ${reason || "(empty)"}`;
@@ -621,7 +713,14 @@
         const historyMeta = document.createElement("p");
         historyMeta.className = "attempt-meta";
         historyMeta.textContent = `History Count: ${historySummary}`;
-        li.append(title, meta, timingMeta, historyMeta);
+        li.append(title, meta, timingMeta);
+        if (tokenUsage && tokenUsage.turn && tokenUsage.game) {
+          const usageMeta = document.createElement("p");
+          usageMeta.className = "attempt-meta";
+          usageMeta.textContent = `Token Usage: Turn ${formatUsage(tokenUsage.turn)} | Game ${formatUsage(tokenUsage.game)}`;
+          li.appendChild(usageMeta);
+        }
+        li.appendChild(historyMeta);
         dom.attempts.appendChild(li);
       }
 
@@ -752,6 +851,7 @@
           let reasoningSoFar = "";
           let toolStreamStarted = false;
           let firstTokenAt = null;
+          let usage = null;
           const decoder = new TextDecoder();
           const reader = res.body.getReader();
           state.currentReader = reader;
@@ -827,6 +927,12 @@
                       }
                     });
                   }
+                  if (packet && packet.usage) {
+                    const usageCandidate = normalizeUsage(packet.usage);
+                    if (usageCandidate) {
+                      usage = usageCandidate;
+                    }
+                  }
                 }
               }
 
@@ -866,7 +972,8 @@
             timing: {
               ttftMs: firstTokenAt === null ? null : firstTokenAt - requestStart,
               totalMs
-            }
+            },
+            usage
           };
         } finally {
           state.currentReader = null;
@@ -909,6 +1016,7 @@
         state.secret = randomSecretWord();
         state.messages = buildInitialMessages();
         state.attemptCount = 0;
+        state.gameUsage = createEmptyUsage();
         let outcome = "running";
 
         setStatus("Game running. Streaming assistant output...");
@@ -922,6 +1030,15 @@
             const guess = turnResult.guess;
             const valid = WORD_SET.has(guess);
             appendLog(`\n[Timing] ${formatTiming(turnResult.timing)}\n`);
+            let usageForHistory = null;
+            if (turnResult.usage && turnResult.usage.hasUsage) {
+              addUsageTotals(state.gameUsage, turnResult.usage);
+              appendLog(`[Token Usage] Turn ${formatUsage(turnResult.usage)} | Game ${formatUsage(state.gameUsage)}\n`);
+              usageForHistory = {
+                turn: cloneUsage(turnResult.usage),
+                game: cloneUsage(state.gameUsage)
+              };
+            }
 
             if (valid) {
               const { statuses, pattern } = evaluateGuess(state.secret, guess);
@@ -935,7 +1052,7 @@
               const historySummary = historySummaryText();
               appendLog(`[History Count] ${historySummary}\n`);
               markRow(turn, guess, statuses);
-              renderAttempt(turn, guess, turnResult.reason, pattern, true, turnResult.timing, historySummary);
+              renderAttempt(turn, guess, turnResult.reason, pattern, true, turnResult.timing, historySummary, usageForHistory);
 
               state.messages.push({
                 role: "assistant",
@@ -977,7 +1094,7 @@
               const historySummary = historySummaryText();
               appendLog("[Invalid Guess] Not in allowed words. Attempt not consumed.\n");
               appendLog(`[History Count] ${historySummary}\n`);
-              renderAttempt(turn, guess, rejectReason, "INVALID", false, turnResult.timing, historySummary, false);
+              renderAttempt(turn, guess, rejectReason, "INVALID", false, turnResult.timing, historySummary, usageForHistory, false);
 
               state.messages.push({
                 role: "assistant",
