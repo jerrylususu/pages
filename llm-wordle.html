@@ -989,12 +989,12 @@
           {
             role: "system",
             content:
-              "You are a Wordle solver. Think in short plain text while streaming, then call tool submit_guess exactly once per turn with JSON key order {\"reason\":\"...\",\"guess\":\"...\"}. Reason must be emitted before guess. Guess must be 5 lowercase letters and selected from allowed_words."
+              "You are a Wordle solver. Think in short plain text while streaming, then call tool submit_guess exactly once per turn with JSON key order {\"reason\":\"...\",\"guess\":\"...\"}. Reason must be emitted before guess. Guess must be a 5-letter lowercase English word. Follow Wordle rules strictly: G means exact position is fixed; Y means the letter is in the word but not in that position; B means no unmatched copy remains for that guess after applying G/Y counts. Repeated letters are allowed, and a letter can appear multiple times in the secret. Never reject a candidate only because it repeats a letter. If one candidate fits all known constraints, guess it."
           },
           {
             role: "user",
             content:
-              `Game starts now. You have ${MAX_ATTEMPTS} turns. Allowed words: ${WORD_LIST.join(", ")}. For every tool call, output reason first and guess second. After each tool response, update your hypothesis and call submit_guess again. Tool response includes guess_history. Never repeat a guess that already appears in guess_history.`
+              `Game starts now. You have ${MAX_ATTEMPTS} turns. Guess common English 5-letter words. For every tool call, output reason first and guess second. After each tool response, update your hypothesis and call submit_guess again. Tool response includes guess_history. Never repeat a guess that already appears in guess_history.`
           }
         ];
       }
@@ -1024,7 +1024,7 @@
                     },
                     guess: {
                       type: "string",
-                      description: "One lowercase 5-letter word from allowed words list."
+                      description: "One lowercase 5-letter common English word."
                     }
                   },
                   required: ["reason", "guess"],
