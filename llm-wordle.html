@@ -7,14 +7,46 @@
     <style>
       :root {
         --bg: #f3f7fb;
+        --bg-top: #d9efff;
         --panel: #ffffff;
         --ink: #102a43;
         --muted: #5d6d7e;
         --line: #d9e2ec;
         --accent: #0d6efd;
+        --secondary-bg: #e6edf5;
+        --secondary-ink: #1f3b57;
+        --status-ink: #224870;
+        --tile-bg: #fdfefe;
+        --attempt-bg: #f9fbfe;
+        --stats-ink: #163550;
+        --log-bg: #081527;
+        --log-ink: #d8f0ff;
         --good: #2f9e44;
         --warn: #e0a800;
         --bad: #7c8594;
+        color-scheme: light;
+      }
+
+      :root[data-theme="dark"] {
+        --bg: #0a1018;
+        --bg-top: #182638;
+        --panel: #111a26;
+        --ink: #e5eef7;
+        --muted: #9db2c7;
+        --line: #27374a;
+        --accent: #4ea1ff;
+        --secondary-bg: #1a2a3d;
+        --secondary-ink: #deebf8;
+        --status-ink: #9ec8f6;
+        --tile-bg: #142234;
+        --attempt-bg: #122033;
+        --stats-ink: #b9d8f4;
+        --log-bg: #050a12;
+        --log-ink: #bfe8ff;
+        --good: #2f9e44;
+        --warn: #c79317;
+        --bad: #5c6677;
+        color-scheme: dark;
       }
 
       * {
@@ -24,7 +56,7 @@
       body {
         margin: 0;
         font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-        background: radial-gradient(circle at top left, #d9efff, var(--bg) 35%);
+        background: radial-gradient(circle at top left, var(--bg-top), var(--bg) 35%);
         color: var(--ink);
       }
 
@@ -95,8 +127,8 @@
       }
 
       button.secondary {
-        background: #e6edf5;
-        color: #1f3b57;
+        background: var(--secondary-bg);
+        color: var(--secondary-ink);
       }
 
       button:disabled {
@@ -106,7 +138,7 @@
 
       .status {
         margin-top: 8px;
-        color: #224870;
+        color: var(--status-ink);
         font-size: 0.95rem;
       }
 
@@ -130,7 +162,7 @@
         font-weight: 700;
         font-size: 1.25rem;
         text-transform: uppercase;
-        background: #fdfefe;
+        background: var(--tile-bg);
       }
 
       .tile.correct {
@@ -161,8 +193,8 @@
         height: 260px;
         overflow: auto;
         margin: 0;
-        background: #081527;
-        color: #d8f0ff;
+        background: var(--log-bg);
+        color: var(--log-ink);
         padding: 10px;
         border-radius: 10px;
         font-size: 0.88rem;
@@ -182,7 +214,7 @@
         border: 1px solid var(--line);
         border-radius: 10px;
         padding: 9px;
-        background: #f9fbfe;
+        background: var(--attempt-bg);
       }
 
       .attempt-title {
@@ -230,7 +262,7 @@
 
       .stats {
         margin-top: 8px;
-        color: #163550;
+        color: var(--stats-ink);
         font-size: 0.9rem;
       }
 
@@ -266,11 +298,16 @@
             Temperature
             <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.4" placeholder="0.4" />
           </label>
+          <label>
+            Max Tokens
+            <input id="maxTokens" type="number" min="1" step="1" value="512" placeholder="512" />
+          </label>
         </div>
         <div class="btns">
           <button id="startBtn" class="primary">Start New Game</button>
           <button id="stopBtn" class="secondary" disabled>Stop</button>
           <button id="saveBtn" class="secondary">Save Config</button>
+          <button id="themeToggle" class="secondary" type="button" aria-label="Toggle color theme">Theme: System</button>
         </div>
         <div class="inline-settings">
           <label><input id="autoNext" type="checkbox" />Auto Next Game</label>
@@ -301,7 +338,10 @@
     <script>
       const STORAGE_KEY = "llm-wordle-config-v1";
       const STATS_STORAGE_KEY = "llm-wordle-stats-v1";
+      const THEME_STORAGE_KEY = "llm-wordle-theme-v1";
       const MAX_ATTEMPTS = 6;
+      const DEFAULT_MAX_TOKENS = 512;
+      const MAX_TOOL_CALL_RETRIES_PER_TURN = 3;
       const WORD_LIST = [
         "about", "their", "there", "which", "would", "other", "after", "first", "think", "could",
         "these", "where", "right", "years", "being", "going", "still", "never", "those", "world",
@@ -361,11 +401,13 @@
         apiKey: document.getElementById("apiKey"),
         model: document.getElementById("model"),
         temperature: document.getElementById("temperature"),
+        maxTokens: document.getElementById("maxTokens"),
         autoNext: document.getElementById("autoNext"),
         autoDelay: document.getElementById("autoDelay"),
         startBtn: document.getElementById("startBtn"),
         stopBtn: document.getElementById("stopBtn"),
         saveBtn: document.getElementById("saveBtn"),
+        themeToggle: document.getElementById("themeToggle"),
         status: document.getElementById("status"),
         stats: document.getElementById("stats"),
         board: document.getElementById("board"),
@@ -378,6 +420,12 @@
         secret: "",
         messages: [],
         attemptCount: 0,
+        feedbackFacts: {
+          confirmedPositions: Array(5).fill(null),
+          presentNotPositionsByLetter: {},
+          absentLetters: new Set(),
+          positiveLetters: new Set()
+        },
         gameUsage: {
           cachedInput: 0,
           input: 0,
@@ -389,6 +437,8 @@
         stopRequested: false,
         stopWaiters: new Set(),
         autoNextTimer: null,
+        themeOverride: null,
+        systemPrefersDark: false,
         stats: {
           games: 0,
           wins: 0,
@@ -405,6 +455,12 @@
       function appendLog(text) {
         dom.streamLog.textContent += text;
         dom.streamLog.scrollTop = dom.streamLog.scrollHeight;
+      }
+
+      function showUiError(rawMessage) {
+        const message = String(rawMessage || "Unknown error");
+        setStatus(`Error: ${message}`);
+        appendLog(`\n[Error] ${message}\n`);
       }
 
       function renderStats() {
@@ -442,6 +498,68 @@
           };
         }
         renderStats();
+      }
+
+      function loadThemeOverride() {
+        const raw = localStorage.getItem(THEME_STORAGE_KEY);
+        if (raw === "dark" || raw === "light") {
+          return raw;
+        }
+        return null;
+      }
+
+      function saveThemeOverride() {
+        if (state.themeOverride === "dark" || state.themeOverride === "light") {
+          localStorage.setItem(THEME_STORAGE_KEY, state.themeOverride);
+          return;
+        }
+        localStorage.removeItem(THEME_STORAGE_KEY);
+      }
+
+      function isDarkThemeActive() {
+        if (state.themeOverride === "dark") return true;
+        if (state.themeOverride === "light") return false;
+        return state.systemPrefersDark;
+      }
+
+      function updateThemeToggleLabel() {
+        if (!dom.themeToggle) return;
+        const darkActive = isDarkThemeActive();
+        if (state.themeOverride) {
+          dom.themeToggle.textContent = darkActive ? "Theme: Dark (Manual)" : "Theme: Light (Manual)";
+        } else {
+          dom.themeToggle.textContent = darkActive ? "Theme: System (Dark)" : "Theme: System (Light)";
+        }
+        dom.themeToggle.setAttribute("aria-pressed", String(darkActive));
+      }
+
+      function applyTheme() {
+        document.documentElement.setAttribute("data-theme", isDarkThemeActive() ? "dark" : "light");
+        updateThemeToggleLabel();
+      }
+
+      function initTheme() {
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        state.systemPrefersDark = mediaQuery.matches;
+        state.themeOverride = loadThemeOverride();
+        applyTheme();
+        const onThemeChange = (event) => {
+          state.systemPrefersDark = event.matches;
+          if (!state.themeOverride) {
+            applyTheme();
+          }
+        };
+        if (typeof mediaQuery.addEventListener === "function") {
+          mediaQuery.addEventListener("change", onThemeChange);
+        } else if (typeof mediaQuery.addListener === "function") {
+          mediaQuery.addListener(onThemeChange);
+        }
+      }
+
+      function toggleThemeOverride() {
+        state.themeOverride = isDarkThemeActive() ? "light" : "dark";
+        saveThemeOverride();
+        applyTheme();
       }
 
       function clearAutoNextTimer() {
@@ -517,6 +635,7 @@
           apiKey: dom.apiKey.value.trim(),
           model: dom.model.value.trim(),
           temperature: dom.temperature.value.trim(),
+          maxTokens: dom.maxTokens.value.trim(),
           autoNext: dom.autoNext.checked,
           autoDelay: dom.autoDelay.value.trim()
         };
@@ -530,6 +649,7 @@
           dom.baseUrl.value = "https://api.openai.com/v1";
           dom.model.value = "gpt-4.1-mini";
           dom.temperature.value = "0.4";
+          dom.maxTokens.value = String(DEFAULT_MAX_TOKENS);
           dom.autoNext.checked = false;
           dom.autoDelay.value = "3";
           return;
@@ -540,12 +660,14 @@
           dom.apiKey.value = config.apiKey || "";
           dom.model.value = config.model || "gpt-4.1-mini";
           dom.temperature.value = String(config.temperature || "0.4");
+          dom.maxTokens.value = String(config.maxTokens || DEFAULT_MAX_TOKENS);
           dom.autoNext.checked = Boolean(config.autoNext);
           dom.autoDelay.value = String(config.autoDelay || "3");
         } catch (_err) {
           dom.baseUrl.value = "https://api.openai.com/v1";
           dom.model.value = "gpt-4.1-mini";
           dom.temperature.value = "0.4";
+          dom.maxTokens.value = String(DEFAULT_MAX_TOKENS);
           dom.autoNext.checked = false;
           dom.autoDelay.value = "3";
         }
@@ -686,6 +808,71 @@
           .join("");
       }
 
+      function createEmptyFeedbackFacts() {
+        return {
+          confirmedPositions: Array(5).fill(null),
+          presentNotPositionsByLetter: {},
+          absentLetters: new Set(),
+          positiveLetters: new Set()
+        };
+      }
+
+      function getFeedbackFactsSnapshot() {
+        const confirmedPositions = state.feedbackFacts.confirmedPositions
+          .map((letter, index) => (letter ? { letter, index: index + 1 } : null))
+          .filter(Boolean);
+        const confirmedPresentNotPositions = Object.keys(state.feedbackFacts.presentNotPositionsByLetter)
+          .sort()
+          .map((letter) => ({
+            letter,
+            not_indexes: Array.from(state.feedbackFacts.presentNotPositionsByLetter[letter])
+              .sort((a, b) => a - b)
+              .map((index) => index + 1)
+          }))
+          .filter((item) => item.not_indexes.length > 0);
+        const confirmedAbsentLetters = Array.from(state.feedbackFacts.absentLetters).sort();
+        return {
+          index_base: 1,
+          confirmed_positions: confirmedPositions,
+          confirmed_present_not_positions: confirmedPresentNotPositions,
+          confirmed_absent_letters: confirmedAbsentLetters
+        };
+      }
+
+      function updateFeedbackFacts(guess, statuses) {
+        const absentCandidates = new Set();
+        for (let i = 0; i < 5; i += 1) {
+          const letter = guess[i];
+          const status = statuses[i];
+          if (status === "correct") {
+            state.feedbackFacts.confirmedPositions[i] = letter;
+            state.feedbackFacts.positiveLetters.add(letter);
+            state.feedbackFacts.absentLetters.delete(letter);
+            continue;
+          }
+          if (status === "present") {
+            state.feedbackFacts.positiveLetters.add(letter);
+            state.feedbackFacts.absentLetters.delete(letter);
+            if (!state.feedbackFacts.presentNotPositionsByLetter[letter]) {
+              state.feedbackFacts.presentNotPositionsByLetter[letter] = new Set();
+            }
+            state.feedbackFacts.presentNotPositionsByLetter[letter].add(i);
+            continue;
+          }
+          if (status === "absent") {
+            absentCandidates.add(letter);
+          }
+        }
+
+        absentCandidates.forEach((letter) => {
+          if (state.feedbackFacts.positiveLetters.has(letter)) {
+            state.feedbackFacts.absentLetters.delete(letter);
+            return;
+          }
+          state.feedbackFacts.absentLetters.add(letter);
+        });
+      }
+
       function historySummaryText() {
         return `Correct ${state.stats.correctGuesses} | Wrong ${state.stats.wrongGuesses}`;
       }
@@ -694,6 +881,12 @@
         const n = Number(raw);
         if (!Number.isFinite(n)) return 0.4;
         return Math.min(2, Math.max(0, n));
+      }
+
+      function parseMaxTokens(raw) {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return DEFAULT_MAX_TOKENS;
+        return Math.max(1, Math.round(n));
       }
 
       function renderAttempt(turn, guess, reason, pattern, valid, timing, historySummary, tokenUsage, attemptUsed = true) {
@@ -786,10 +979,12 @@
       async function streamOneTurn(config) {
         const requestStart = performance.now();
         const endpoint = normalizeEndpoint(config.baseUrl);
+        const maxTokens = parseMaxTokens(config.maxTokens);
         const payload = {
           model: config.model,
           stream: true,
           temperature: parseTemperature(config.temperature),
+          max_tokens: maxTokens,
           messages: state.messages,
           tools: [
             {
@@ -852,6 +1047,7 @@
           let toolStreamStarted = false;
           let firstTokenAt = null;
           let usage = null;
+          let finishReason = null;
           const decoder = new TextDecoder();
           const reader = res.body.getReader();
           state.currentReader = reader;
@@ -881,6 +1077,14 @@
                 }
                 if (data) {
                   const packet = safeJsonParse(data);
+                  if (
+                    packet &&
+                    Array.isArray(packet.choices) &&
+                    packet.choices[0] &&
+                    typeof packet.choices[0].finish_reason === "string"
+                  ) {
+                    finishReason = packet.choices[0].finish_reason;
+                  }
                   const delta = packet && packet.choices && packet.choices[0] && packet.choices[0].delta;
                   if (delta && typeof delta.content === "string" && delta.content.length > 0) {
                     markFirstToken();
@@ -942,6 +1146,20 @@
 
           const call = toolCalls.find((item) => item && item.function && item.function.name === "submit_guess");
           if (!call) {
+            const hitMaxTokens = finishReason === "length" || Boolean(usage && usage.output >= maxTokens);
+            if (hitMaxTokens) {
+              return {
+                retryableNoToolCall: true,
+                reason: "Reached max tokens without receiving submit_guess tool call.",
+                maxTokens,
+                finishReason: finishReason || "unknown",
+                timing: {
+                  ttftMs: firstTokenAt === null ? null : firstTokenAt - requestStart,
+                  totalMs: performance.now() - requestStart
+                },
+                usage
+              };
+            }
             throw new Error("No submit_guess tool call received.");
           }
 
@@ -989,6 +1207,7 @@
           apiKey: dom.apiKey.value.trim(),
           model: dom.model.value.trim(),
           temperature: dom.temperature.value.trim(),
+          maxTokens: dom.maxTokens.value.trim(),
           autoNext: dom.autoNext.checked,
           autoDelay: dom.autoDelay.value.trim()
         };
@@ -1016,6 +1235,7 @@
         state.secret = randomSecretWord();
         state.messages = buildInitialMessages();
         state.attemptCount = 0;
+        state.feedbackFacts = createEmptyFeedbackFacts();
         state.gameUsage = createEmptyUsage();
         let outcome = "running";
 
@@ -1026,7 +1246,45 @@
             const turn = state.attemptCount + 1;
             appendLog(`\n\n[Turn ${turn}]\n`);
 
-            const turnResult = await streamOneTurn(config);
+            let turnResult = null;
+            let retryCount = 0;
+            while (true) {
+              try {
+                turnResult = await streamOneTurn(config);
+                if (!turnResult.retryableNoToolCall) {
+                  break;
+                }
+
+                retryCount += 1;
+                appendLog(
+                  `[Retry] Turn ${turn}: max tokens ${turnResult.maxTokens} reached (finish_reason=${turnResult.finishReason}) before tool call. Retrying ${retryCount}/${MAX_TOOL_CALL_RETRIES_PER_TURN}...\n`
+                );
+                if (retryCount >= MAX_TOOL_CALL_RETRIES_PER_TURN) {
+                  const limitErr = new Error(
+                    `Turn ${turn} retried ${MAX_TOOL_CALL_RETRIES_PER_TURN} times due to max token limit without tool call. Increase max tokens or improve prompt constraints.`
+                  );
+                  limitErr.retryLimitReached = true;
+                  throw limitErr;
+                }
+              } catch (err) {
+                if (err && err.name === "AbortError") {
+                  throw err;
+                }
+                if (err && err.retryLimitReached) {
+                  throw err;
+                }
+                retryCount += 1;
+                const message = String((err && err.message) || err || "Unknown error");
+                appendLog(
+                  `[Retry] Turn ${turn}: invalid response (${message.slice(0, 280)}). Retrying ${retryCount}/${MAX_TOOL_CALL_RETRIES_PER_TURN}...\n`
+                );
+                if (retryCount >= MAX_TOOL_CALL_RETRIES_PER_TURN) {
+                  throw new Error(
+                    `Turn ${turn} retried ${MAX_TOOL_CALL_RETRIES_PER_TURN} times due to invalid response. Last error: ${message.slice(0, 280)}`
+                  );
+                }
+              }
+            }
             const guess = turnResult.guess;
             const valid = WORD_SET.has(guess);
             appendLog(`\n[Timing] ${formatTiming(turnResult.timing)}\n`);
@@ -1042,6 +1300,8 @@
 
             if (valid) {
               const { statuses, pattern } = evaluateGuess(state.secret, guess);
+              updateFeedbackFacts(guess, statuses);
+              const feedbackFacts = getFeedbackFactsSnapshot();
               const solved = guess === state.secret;
               if (solved) {
                 state.stats.correctGuesses += 1;
@@ -1076,6 +1336,7 @@
                   guess,
                   pattern,
                   positions: statuses,
+                  feedback_facts: feedbackFacts,
                   solved: guess === state.secret,
                   note: "G = correct place, Y = letter exists elsewhere, B = letter absent"
                 })
@@ -1116,6 +1377,7 @@
                 tool_call_id: turnResult.toolCall.id,
                 content: JSON.stringify({
                   guess,
+                  feedback_facts: getFeedbackFactsSnapshot(),
                   error: "Guess must be from allowed_words exactly. This input is invalid and does not consume an attempt.",
                   consumes_attempt: false,
                   turn,
@@ -1143,7 +1405,7 @@
             outcome = "stopped";
           } else {
             const message = String(err.message || err);
-            setStatus(`Error: ${message}`);
+            showUiError(message);
             outcome = "error";
           }
         } finally {
@@ -1190,7 +1452,9 @@
       });
       dom.stopBtn.addEventListener("click", stopGame);
       dom.saveBtn.addEventListener("click", saveConfig);
+      dom.themeToggle.addEventListener("click", toggleThemeOverride);
 
+      initTheme();
       loadConfig();
       loadStats();
       createBoard();
