@@ -1312,7 +1312,7 @@
             }
             const guess = turnResult.guess;
             const alreadyTried = state.triedGuesses.includes(guess);
-            const valid = WORD_SET.has(guess);
+            const inWordList = WORD_SET.has(guess);
             appendLog(`\n[Timing] ${formatTiming(turnResult.timing)}\n`);
             let usageForHistory = null;
             if (turnResult.usage && turnResult.usage.hasUsage) {
@@ -1369,98 +1369,65 @@
             state.triedGuesses.push(guess);
             const triedHistory = guessHistorySnapshot();
 
-            if (valid) {
-              const { statuses, pattern } = evaluateGuess(state.secret, guess);
-              updateFeedbackFacts(guess, statuses);
-              const feedbackFacts = getFeedbackFactsSnapshot();
-              const solved = guess === state.secret;
-              if (solved) {
-                state.stats.correctGuesses += 1;
-              } else {
-                state.stats.wrongGuesses += 1;
-              }
-              saveStats();
-              const historySummary = historySummaryText();
-              appendLog(`[History Count] ${historySummary}\n`);
-              markRow(turn, guess, statuses);
-              renderAttempt(turn, guess, turnResult.reason, pattern, true, turnResult.timing, historySummary, usageForHistory);
-
-              state.messages.push({
-                role: "assistant",
-                content: turnResult.thought,
-                tool_calls: [
-                  {
-                    id: turnResult.toolCall.id,
-                    type: "function",
-                    function: {
-                      name: "submit_guess",
-                      arguments: turnResult.toolCall.function.arguments
-                    }
-                  }
-                ]
-              });
-
-              state.messages.push({
-                role: "tool",
-                tool_call_id: turnResult.toolCall.id,
-                content: JSON.stringify({
-                  guess,
-                  pattern,
-                  positions: statuses,
-                  feedback_facts: feedbackFacts,
-                  solved: guess === state.secret,
-                  note: "G = correct place, Y = letter exists elsewhere, B = letter absent",
-                  guess_history: triedHistory,
-                  history_count: triedHistory.length
-                })
-              });
-
-              state.attemptCount += 1;
-
-              if (solved) {
-                setStatus(`Solved in ${turn} turns. Secret word: ${state.secret.toUpperCase()}.`);
-                state.running = false;
-                outcome = "win";
-                break;
-              }
+            const { statuses, pattern } = evaluateGuess(state.secret, guess);
+            updateFeedbackFacts(guess, statuses);
+            const feedbackFacts = getFeedbackFactsSnapshot();
+            const solved = guess === state.secret;
+            if (solved) {
+              state.stats.correctGuesses += 1;
             } else {
-              const rejectReason = turnResult.reason || "Guess is invalid. Use a common English 5-letter word.";
-              const historySummary = historySummaryText();
-              appendLog("[Invalid Guess] Invalid word. Attempt not consumed.\n");
-              appendLog(`[History Count] ${historySummary}\n`);
-              renderAttempt(turn, guess, rejectReason, "INVALID", false, turnResult.timing, historySummary, usageForHistory, false);
+              state.stats.wrongGuesses += 1;
+            }
+            saveStats();
+            const historySummary = historySummaryText();
+            if (!inWordList) {
+              appendLog("[Out-of-List Guess] Not in local word list, evaluated normally.\n");
+            }
+            appendLog(`[History Count] ${historySummary}\n`);
+            markRow(turn, guess, statuses);
+            const renderReason = inWordList
+              ? turnResult.reason
+              : `${turnResult.reason ? `${turnResult.reason} ` : ""}(Out-of-list guess accepted and checked normally.)`;
+            renderAttempt(turn, guess, renderReason, pattern, true, turnResult.timing, historySummary, usageForHistory);
 
-              state.messages.push({
-                role: "assistant",
-                content: turnResult.thought,
-                tool_calls: [
-                  {
-                    id: turnResult.toolCall.id,
-                    type: "function",
-                    function: {
-                      name: "submit_guess",
-                      arguments: turnResult.toolCall.function.arguments
-                    }
+            state.messages.push({
+              role: "assistant",
+              content: turnResult.thought,
+              tool_calls: [
+                {
+                  id: turnResult.toolCall.id,
+                  type: "function",
+                  function: {
+                    name: "submit_guess",
+                    arguments: turnResult.toolCall.function.arguments
                   }
-                ]
-              });
+                }
+              ]
+            });
 
-              state.messages.push({
-                role: "tool",
-                tool_call_id: turnResult.toolCall.id,
-                content: JSON.stringify({
-                  guess,
-                  feedback_facts: getFeedbackFactsSnapshot(),
-                  error: "Guess is invalid. Use a common English 5-letter word. This input does not consume an attempt.",
-                  consumes_attempt: false,
-                  turn,
-                  attempts_used: state.attemptCount,
-                  attempts_remaining: MAX_ATTEMPTS - state.attemptCount,
-                  guess_history: triedHistory,
-                  history_count: triedHistory.length
-                })
-              });
-              continue;
+            state.messages.push({
+              role: "tool",
+              tool_call_id: turnResult.toolCall.id,
+              content: JSON.stringify({
+                guess,
+                pattern,
+                positions: statuses,
+                feedback_facts: feedbackFacts,
+                in_word_list: inWordList,
+                solved: guess === state.secret,
+                note: "G = correct place, Y = letter exists elsewhere, B = letter absent",
+                guess_history: triedHistory,
+                history_count: triedHistory.length
+              })
+            });
+
+            state.attemptCount += 1;
+
+            if (solved) {
+              setStatus(`Solved in ${turn} turns. Secret word: ${state.secret.toUpperCase()}.`);
+              state.running = false;
+              outcome = "win";
+              break;
             }
           }
 
