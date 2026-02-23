@@ -1424,9 +1424,9 @@
                 break;
               }
             } else {
-              const rejectReason = turnResult.reason || "Guess not in allowed list.";
+              const rejectReason = turnResult.reason || "Guess is invalid. Use a common English 5-letter word.";
               const historySummary = historySummaryText();
-              appendLog("[Invalid Guess] Not in allowed words. Attempt not consumed.\n");
+              appendLog("[Invalid Guess] Invalid word. Attempt not consumed.\n");
               appendLog(`[History Count] ${historySummary}\n`);
               renderAttempt(turn, guess, rejectReason, "INVALID", false, turnResult.timing, historySummary, usageForHistory, false);
 
@@ -1451,12 +1451,11 @@
                 content: JSON.stringify({
                   guess,
                   feedback_facts: getFeedbackFactsSnapshot(),
-                  error: "Guess must be from allowed_words exactly. This input is invalid and does not consume an attempt.",
+                  error: "Guess is invalid. Use a common English 5-letter word. This input does not consume an attempt.",
                   consumes_attempt: false,
                   turn,
                   attempts_used: state.attemptCount,
                   attempts_remaining: MAX_ATTEMPTS - state.attemptCount,
-                  allowed_words: WORD_LIST,
                   guess_history: triedHistory,
                   history_count: triedHistory.length
                 })
