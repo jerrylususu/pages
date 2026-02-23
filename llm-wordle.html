@@ -312,6 +312,7 @@
         <div class="inline-settings">
           <label><input id="autoNext" type="checkbox" />Auto Next Game</label>
           <label>Delay(s): <input id="autoDelay" type="number" min="0" max="60" step="1" value="3" /></label>
+          <label>Live Stream Max Lines: <input id="streamMaxLines" type="number" min="50" max="5000" step="50" value="500" /></label>
         </div>
         <div class="status" id="status">Idle.</div>
         <div class="stats" id="stats"></div>
@@ -341,6 +342,7 @@
       const THEME_STORAGE_KEY = "llm-wordle-theme-v1";
       const MAX_ATTEMPTS = 6;
       const DEFAULT_MAX_TOKENS = 512;
+      const DEFAULT_STREAM_MAX_LINES = 500;
       const MAX_TOOL_CALL_RETRIES_PER_TURN = 3;
       const WORD_LIST = [
         "about", "their", "there", "which", "would", "other", "after", "first", "think", "could",
@@ -404,6 +406,7 @@
         maxTokens: document.getElementById("maxTokens"),
         autoNext: document.getElementById("autoNext"),
         autoDelay: document.getElementById("autoDelay"),
+        streamMaxLines: document.getElementById("streamMaxLines"),
         startBtn: document.getElementById("startBtn"),
         stopBtn: document.getElementById("stopBtn"),
         saveBtn: document.getElementById("saveBtn"),
@@ -420,6 +423,7 @@
         secret: "",
         messages: [],
         attemptCount: 0,
+        triedGuesses: [],
         feedbackFacts: {
           confirmedPositions: Array(5).fill(null),
           presentNotPositionsByLetter: {},
@@ -454,6 +458,11 @@
 
       function appendLog(text) {
         dom.streamLog.textContent += text;
+        const maxLines = parseStreamMaxLines(dom.streamMaxLines.value);
+        const lines = dom.streamLog.textContent.split("\n");
+        if (lines.length > maxLines) {
+          dom.streamLog.textContent = lines.slice(lines.length - maxLines).join("\n");
+        }
         dom.streamLog.scrollTop = dom.streamLog.scrollHeight;
       }
 
@@ -637,7 +646,8 @@
           temperature: dom.temperature.value.trim(),
           maxTokens: dom.maxTokens.value.trim(),
           autoNext: dom.autoNext.checked,
-          autoDelay: dom.autoDelay.value.trim()
+          autoDelay: dom.autoDelay.value.trim(),
+          streamMaxLines: dom.streamMaxLines.value.trim()
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
         setStatus("Config saved.");
@@ -652,6 +662,7 @@
           dom.maxTokens.value = String(DEFAULT_MAX_TOKENS);
           dom.autoNext.checked = false;
           dom.autoDelay.value = "3";
+          dom.streamMaxLines.value = String(DEFAULT_STREAM_MAX_LINES);
           return;
         }
         try {
@@ -663,6 +674,7 @@
           dom.maxTokens.value = String(config.maxTokens || DEFAULT_MAX_TOKENS);
           dom.autoNext.checked = Boolean(config.autoNext);
           dom.autoDelay.value = String(config.autoDelay || "3");
+          dom.streamMaxLines.value = String(parseStreamMaxLines(config.streamMaxLines));
         } catch (_err) {
           dom.baseUrl.value = "https://api.openai.com/v1";
           dom.model.value = "gpt-4.1-mini";
@@ -670,6 +682,7 @@
           dom.maxTokens.value = String(DEFAULT_MAX_TOKENS);
           dom.autoNext.checked = false;
           dom.autoDelay.value = "3";
+          dom.streamMaxLines.value = String(DEFAULT_STREAM_MAX_LINES);
         }
       }
 
@@ -877,6 +890,10 @@
         return `Correct ${state.stats.correctGuesses} | Wrong ${state.stats.wrongGuesses}`;
       }
 
+      function guessHistorySnapshot() {
+        return state.triedGuesses.slice();
+      }
+
       function parseTemperature(raw) {
         const n = Number(raw);
         if (!Number.isFinite(n)) return 0.4;
@@ -887,6 +904,12 @@
         const n = Number(raw);
         if (!Number.isFinite(n)) return DEFAULT_MAX_TOKENS;
         return Math.max(1, Math.round(n));
+      }
+
+      function parseStreamMaxLines(raw) {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return DEFAULT_STREAM_MAX_LINES;
+        return Math.max(50, Math.min(5000, Math.round(n)));
       }
 
       function renderAttempt(turn, guess, reason, pattern, valid, timing, historySummary, tokenUsage, attemptUsed = true) {
@@ -971,7 +994,7 @@
           {
             role: "user",
             content:
-              `Game starts now. You have ${MAX_ATTEMPTS} turns. Allowed words: ${WORD_LIST.join(", ")}. For every tool call, output reason first and guess second. After each tool response, update your hypothesis and call submit_guess again.`
+              `Game starts now. You have ${MAX_ATTEMPTS} turns. Allowed words: ${WORD_LIST.join(", ")}. For every tool call, output reason first and guess second. After each tool response, update your hypothesis and call submit_guess again. Tool response includes guess_history. Never repeat a guess that already appears in guess_history.`
           }
         ];
       }
@@ -1209,7 +1232,8 @@
           temperature: dom.temperature.value.trim(),
           maxTokens: dom.maxTokens.value.trim(),
           autoNext: dom.autoNext.checked,
-          autoDelay: dom.autoDelay.value.trim()
+          autoDelay: dom.autoDelay.value.trim(),
+          streamMaxLines: dom.streamMaxLines.value.trim()
         };
 
         if (!config.baseUrl || !config.apiKey || !config.model) {
@@ -1221,10 +1245,10 @@
         dom.startBtn.disabled = true;
         dom.stopBtn.disabled = false;
         dom.saveBtn.disabled = true;
+        dom.attempts.innerHTML = "";
         if (autoTriggered) {
           appendLog("\n\n===== Auto Next Game =====\n");
         } else {
-          dom.attempts.innerHTML = "";
           dom.streamLog.textContent = "";
         }
         createBoard();
@@ -1235,6 +1259,7 @@
         state.secret = randomSecretWord();
         state.messages = buildInitialMessages();
         state.attemptCount = 0;
+        state.triedGuesses = [];
         state.feedbackFacts = createEmptyFeedbackFacts();
         state.gameUsage = createEmptyUsage();
         let outcome = "running";
@@ -1286,6 +1311,7 @@
               }
             }
             const guess = turnResult.guess;
+            const alreadyTried = state.triedGuesses.includes(guess);
             const valid = WORD_SET.has(guess);
             appendLog(`\n[Timing] ${formatTiming(turnResult.timing)}\n`);
             let usageForHistory = null;
@@ -1297,6 +1323,51 @@
                 game: cloneUsage(state.gameUsage)
               };
             }
+
+            if (alreadyTried) {
+              const rejectReason = "Guess already attempted in this game. Review guess_history and choose a new word.";
+              const historySummary = historySummaryText();
+              const triedHistory = guessHistorySnapshot();
+              appendLog("[Duplicate Guess] Already attempted. Attempt not consumed.\n");
+              appendLog(`[History Count] ${historySummary}\n`);
+              renderAttempt(turn, guess, rejectReason, "DUPLICATE", false, turnResult.timing, historySummary, usageForHistory, false);
+
+              state.messages.push({
+                role: "assistant",
+                content: turnResult.thought,
+                tool_calls: [
+                  {
+                    id: turnResult.toolCall.id,
+                    type: "function",
+                    function: {
+                      name: "submit_guess",
+                      arguments: turnResult.toolCall.function.arguments
+                    }
+                  }
+                ]
+              });
+
+              state.messages.push({
+                role: "tool",
+                tool_call_id: turnResult.toolCall.id,
+                content: JSON.stringify({
+                  guess,
+                  feedback_facts: getFeedbackFactsSnapshot(),
+                  error: "Guess already tried. Check guess_history and submit a new word.",
+                  already_tried: true,
+                  consumes_attempt: false,
+                  turn,
+                  attempts_used: state.attemptCount,
+                  attempts_remaining: MAX_ATTEMPTS - state.attemptCount,
+                  guess_history: triedHistory,
+                  history_count: triedHistory.length
+                })
+              });
+              continue;
+            }
+
+            state.triedGuesses.push(guess);
+            const triedHistory = guessHistorySnapshot();
 
             if (valid) {
               const { statuses, pattern } = evaluateGuess(state.secret, guess);
@@ -1338,7 +1409,9 @@
                   positions: statuses,
                   feedback_facts: feedbackFacts,
                   solved: guess === state.secret,
-                  note: "G = correct place, Y = letter exists elsewhere, B = letter absent"
+                  note: "G = correct place, Y = letter exists elsewhere, B = letter absent",
+                  guess_history: triedHistory,
+                  history_count: triedHistory.length
                 })
               });
 
@@ -1383,7 +1456,9 @@
                   turn,
                   attempts_used: state.attemptCount,
                   attempts_remaining: MAX_ATTEMPTS - state.attemptCount,
-                  allowed_words: WORD_LIST
+                  allowed_words: WORD_LIST,
+                  guess_history: triedHistory,
+                  history_count: triedHistory.length
                 })
               });
               continue;
