@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Wordle</title>
+    <style>
+      :root {
+        --bg: #f3f7fb;
+        --panel: #ffffff;
+        --ink: #102a43;
+        --muted: #5d6d7e;
+        --line: #d9e2ec;
+        --accent: #0d6efd;
+        --good: #2f9e44;
+        --warn: #e0a800;
+        --bad: #7c8594;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: radial-gradient(circle at top left, #d9efff, var(--bg) 35%);
+        color: var(--ink);
+      }
+
+      .app {
+        width: min(1100px, 96vw);
+        margin: 24px auto 36px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 4px 12px rgba(17, 36, 58, 0.05);
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 1.55rem;
+      }
+
+      .sub {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 10px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        font-size: 0.95rem;
+      }
+
+      .btns {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        cursor: pointer;
+        font-size: 0.95rem;
+      }
+
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      button.secondary {
+        background: #e6edf5;
+        color: #1f3b57;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .status {
+        margin-top: 8px;
+        color: #224870;
+        font-size: 0.95rem;
+      }
+
+      .board {
+        display: grid;
+        gap: 8px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(44px, 56px));
+        gap: 7px;
+      }
+
+      .tile {
+        height: 56px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        font-weight: 700;
+        font-size: 1.25rem;
+        text-transform: uppercase;
+        background: #fdfefe;
+      }
+
+      .tile.correct {
+        background: var(--good);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .tile.present {
+        background: var(--warn);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .tile.absent {
+        background: var(--bad);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+
+      .log {
+        height: 260px;
+        overflow: auto;
+        margin: 0;
+        background: #081527;
+        color: #d8f0ff;
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        line-height: 1.35;
+        white-space: pre-wrap;
+      }
+
+      .attempt-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 10px;
+      }
+
+      .attempt-list li {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 9px;
+        background: #f9fbfe;
+      }
+
+      .attempt-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .attempt-meta {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      .hint {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .inline-settings {
+        margin-top: 8px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .inline-settings input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin: 0 5px 0 0;
+        transform: translateY(2px);
+      }
+
+      .inline-settings input[type="number"] {
+        width: 90px;
+        padding: 7px 8px;
+      }
+
+      .stats {
+        margin-top: 8px;
+        color: #163550;
+        font-size: 0.9rem;
+      }
+
+      @media (min-width: 960px) {
+        .cols {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel">
+        <h1>LLM Wordle (Single File)</h1>
+        <p class="sub">Stream assistant reasoning, require a tool call guess every turn, and score with Wordle rules.</p>
+      </section>
+
+      <section class="panel">
+        <div class="grid">
+          <label>
+            Base URL
+            <input id="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+          </label>
+          <label>
+            API Key
+            <input id="apiKey" type="password" placeholder="sk-..." />
+          </label>
+          <label>
+            Model
+            <input id="model" type="text" placeholder="gpt-4.1-mini" />
+          </label>
+          <label>
+            Temperature
+            <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.4" placeholder="0.4" />
+          </label>
+        </div>
+        <div class="btns">
+          <button id="startBtn" class="primary">Start New Game</button>
+          <button id="stopBtn" class="secondary" disabled>Stop</button>
+          <button id="saveBtn" class="secondary">Save Config</button>
+        </div>
+        <div class="inline-settings">
+          <label><input id="autoNext" type="checkbox" />Auto Next Game</label>
+          <label>Delay(s): <input id="autoDelay" type="number" min="0" max="60" step="1" value="3" /></label>
+        </div>
+        <div class="status" id="status">Idle.</div>
+        <div class="stats" id="stats"></div>
+        <div class="hint">Config is saved to <span class="mono">localStorage</span> in this browser only.</div>
+      </section>
+
+      <section class="panel cols">
+        <div>
+          <h2>Board</h2>
+          <div id="board" class="board"></div>
+        </div>
+        <div>
+          <h2>Live Stream</h2>
+          <pre id="streamLog" class="log"></pre>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Guess History</h2>
+        <ul id="attempts" class="attempt-list"></ul>
+      </section>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "llm-wordle-config-v1";
+      const STATS_STORAGE_KEY = "llm-wordle-stats-v1";
+      const MAX_ATTEMPTS = 6;
+      const WORD_LIST = [
+        "about", "their", "there", "which", "would", "other", "after", "first", "think", "could",
+        "these", "where", "right", "years", "being", "going", "still", "never", "those", "world",
+        "great", "while", "every", "state", "three", "since", "under", "thing", "house", "place",
+        "again", "found", "might", "money", "night", "until", "doing", "group", "women", "start",
+        "times", "today", "point", "music", "power", "water", "based", "small", "white", "later",
+        "order", "party", "thank", "using", "black", "makes", "whole", "maybe", "story", "games",
+        "least", "means", "early", "local", "video", "young", "court", "given", "level", "often",
+        "death", "hours", "south", "known", "large", "wrong", "along", "needs", "class", "close",
+        "comes", "looks", "cause", "happy", "human", "woman", "leave", "north", "watch", "light",
+        "short", "taken", "third", "among", "check", "heart", "asked", "child", "major", "media",
+        "phone", "quite", "works", "final", "front", "ready", "bring", "heard", "march", "study",
+        "clear", "month", "words", "board", "field", "seems", "wants", "fight", "force", "issue",
+        "price", "shows", "space", "total", "above", "share", "april", "sense", "weeks", "break",
+        "event", "sorry", "takes", "girls", "guess", "learn", "added", "alone", "hands", "movie",
+        "press", "tried", "worth", "areas", "books", "sound", "value", "lives", "round", "stand",
+        "stuff", "drive", "green", "match", "model", "trust", "range", "trade", "chief", "lower",
+        "style", "blood", "stage", "terms", "title", "enjoy", "cover", "legal", "seven", "staff",
+        "super", "union", "began", "built", "crazy", "daily", "knows", "paper", "parts", "voice",
+        "whose", "earth", "rules", "below", "offer", "sleep", "table", "truth", "build", "cases",
+        "piece", "visit", "wrote", "gives", "river", "shall", "speak", "write", "album", "eight",
+        "funny", "peace", "sales", "spent", "store", "track", "ahead", "allow", "brown", "moved",
+        "plans", "radio", "cross", "focus", "loved", "miles", "speed", "extra", "quick", "agree",
+        "clean", "photo", "scene", "spend", "teams", "coach", "costs", "heavy", "train", "claim",
+        "goals", "hotel", "judge", "lines", "named", "brain", "floor", "image", "meant", "reach",
+        "civil", "dance", "stock", "worst", "beach", "ended", "older", "calls", "color", "dream",
+        "grand", "names", "sweet", "touch", "doubt", "drink", "feels", "shown", "basic", "carry",
+        "crime", "fully", "plant", "worse", "award", "block", "lived", "rates", "avoid", "catch",
+        "coast", "trial", "truly", "queen", "stars", "broke", "glass", "prior", "royal", "serve",
+        "types", "begin", "ideas", "notes", "plays", "songs", "twice", "worry", "brand", "count",
+        "fresh", "mouth", "owner", "scale", "score", "smart", "throw", "views", "click", "faith",
+        "metal", "agent", "apply", "basis", "enter", "prime", "waste", "weird", "adult", "grade",
+        "stone", "users", "apart", "aware", "fifth", "items", "proud", "tells", "birth", "drugs",
+        "labor", "lucky", "prove", "tough", "units", "alive", "apple", "cards", "dress", "horse",
+        "liked", "magic", "owned", "stick", "turns", "cells", "guide", "raise", "treat", "yours",
+        "youth", "funds", "helps", "sites", "exist", "forms", "guard", "likes", "shoot", "sides",
+        "solid", "sport", "steps", "taste", "facts", "hello", "links", "plane", "shape", "upper",
+        "cheap", "joint", "signs", "steel", "tired", "crowd", "enemy", "fixed", "limit", "ocean",
+        "proof", "asian", "banks", "chair", "homes", "honor", "noted", "trees", "email", "stuck",
+        "sugar", "drama", "entry", "grant", "grown", "heads", "keeps", "lying", "route", "saved",
+        "shoes", "smoke", "squad", "teach", "tests", "abuse", "angry", "laugh", "loves", "lunch",
+        "storm", "actor", "chain", "equal", "leads", "posts", "quiet", "split", "taxes", "urban",
+        "fault", "films", "mixed", "phase", "smile", "truck", "votes", "blame", "dying", "falls",
+        "false", "fired", "novel", "shirt", "shots", "cream", "giant", "mayor", "minor", "pages",
+        "theme", "usual", "voted", "walls", "draft", "drunk", "finds", "spoke", "talks", "upset",
+        "birds", "cycle", "goods", "holds", "armed", "aside", "deals", "empty", "faces", "folks",
+        "moves", "prize", "rural", "tools", "admit", "favor", "frame", "guest", "teeth", "bunch",
+        "fruit", "index", "shift", "stood", "tight", "crown", "grace", "rooms", "chose", "crash",
+        "depth", "dirty", "error", "noise", "panel", "plate", "roads", "shame", "ships", "bible",
+        "cable", "dates", "doors", "irish", "multi", "print", "sight", "broad", "drawn", "motor",
+        "seats", "solar", "tries", "balls", "bills", "blind", "brief", "chest", "debut", "paint",
+      ];
+      const WORD_SET = new Set(WORD_LIST);
+
+      const dom = {
+        baseUrl: document.getElementById("baseUrl"),
+        apiKey: document.getElementById("apiKey"),
+        model: document.getElementById("model"),
+        temperature: document.getElementById("temperature"),
+        autoNext: document.getElementById("autoNext"),
+        autoDelay: document.getElementById("autoDelay"),
+        startBtn: document.getElementById("startBtn"),
+        stopBtn: document.getElementById("stopBtn"),
+        saveBtn: document.getElementById("saveBtn"),
+        status: document.getElementById("status"),
+        stats: document.getElementById("stats"),
+        board: document.getElementById("board"),
+        streamLog: document.getElementById("streamLog"),
+        attempts: document.getElementById("attempts")
+      };
+
+      const state = {
+        running: false,
+        secret: "",
+        messages: [],
+        attemptCount: 0,
+        abortController: null,
+        currentReader: null,
+        stopRequested: false,
+        stopWaiters: new Set(),
+        autoNextTimer: null,
+        stats: {
+          games: 0,
+          wins: 0,
+          losses: 0,
+          correctGuesses: 0,
+          wrongGuesses: 0
+        }
+      };
+
+      function setStatus(text) {
+        dom.status.textContent = text;
+      }
+
+      function appendLog(text) {
+        dom.streamLog.textContent += text;
+        dom.streamLog.scrollTop = dom.streamLog.scrollHeight;
+      }
+
+      function renderStats() {
+        dom.stats.textContent =
+          `History: games ${state.stats.games} | wins ${state.stats.wins} | losses ${state.stats.losses} | correct guesses ${state.stats.correctGuesses} | wrong guesses ${state.stats.wrongGuesses}`;
+      }
+
+      function saveStats() {
+        localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(state.stats));
+        renderStats();
+      }
+
+      function loadStats() {
+        const raw = localStorage.getItem(STATS_STORAGE_KEY);
+        if (!raw) {
+          renderStats();
+          return;
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          state.stats = {
+            games: Number(parsed.games) || 0,
+            wins: Number(parsed.wins) || 0,
+            losses: Number(parsed.losses) || 0,
+            correctGuesses: Number(parsed.correctGuesses) || 0,
+            wrongGuesses: Number(parsed.wrongGuesses) || 0
+          };
+        } catch (_err) {
+          state.stats = {
+            games: 0,
+            wins: 0,
+            losses: 0,
+            correctGuesses: 0,
+            wrongGuesses: 0
+          };
+        }
+        renderStats();
+      }
+
+      function clearAutoNextTimer() {
+        if (state.autoNextTimer !== null) {
+          clearTimeout(state.autoNextTimer);
+          state.autoNextTimer = null;
+        }
+      }
+
+      function makeAbortError() {
+        try {
+          return new DOMException("Stopped by user.", "AbortError");
+        } catch (_err) {
+          const err = new Error("Stopped by user.");
+          err.name = "AbortError";
+          return err;
+        }
+      }
+
+      function notifyStopWaiters() {
+        const waiters = Array.from(state.stopWaiters);
+        state.stopWaiters.clear();
+        waiters.forEach((rejecter) => {
+          try {
+            rejecter(makeAbortError());
+          } catch (_err) {
+          }
+        });
+      }
+
+      function raceWithStop(promise) {
+        if (state.stopRequested) {
+          return Promise.reject(makeAbortError());
+        }
+        return new Promise((resolve, reject) => {
+          const onStop = (abortErr) => reject(abortErr || makeAbortError());
+          state.stopWaiters.add(onStop);
+          promise.then(
+            (value) => {
+              state.stopWaiters.delete(onStop);
+              resolve(value);
+            },
+            (error) => {
+              state.stopWaiters.delete(onStop);
+              reject(error);
+            }
+          );
+        });
+      }
+
+      function parseAutoDelaySeconds(raw) {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return 3;
+        return Math.max(0, Math.min(60, Math.round(n)));
+      }
+
+      function scheduleAutoNext() {
+        clearAutoNextTimer();
+        if (!dom.autoNext.checked) return;
+        const delaySeconds = parseAutoDelaySeconds(dom.autoDelay.value);
+        appendLog(`[Auto Next] Starting next game in ${delaySeconds}s...\n`);
+        state.autoNextTimer = setTimeout(() => {
+          state.autoNextTimer = null;
+          if (!state.running) {
+            runGame({ autoTriggered: true });
+          }
+        }, delaySeconds * 1000);
+      }
+
+      function saveConfig() {
+        const config = {
+          baseUrl: dom.baseUrl.value.trim(),
+          apiKey: dom.apiKey.value.trim(),
+          model: dom.model.value.trim(),
+          temperature: dom.temperature.value.trim(),
+          autoNext: dom.autoNext.checked,
+          autoDelay: dom.autoDelay.value.trim()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        setStatus("Config saved.");
+      }
+
+      function loadConfig() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          dom.baseUrl.value = "https://api.openai.com/v1";
+          dom.model.value = "gpt-4.1-mini";
+          dom.temperature.value = "0.4";
+          dom.autoNext.checked = false;
+          dom.autoDelay.value = "3";
+          return;
+        }
+        try {
+          const config = JSON.parse(raw);
+          dom.baseUrl.value = config.baseUrl || "https://api.openai.com/v1";
+          dom.apiKey.value = config.apiKey || "";
+          dom.model.value = config.model || "gpt-4.1-mini";
+          dom.temperature.value = String(config.temperature || "0.4");
+          dom.autoNext.checked = Boolean(config.autoNext);
+          dom.autoDelay.value = String(config.autoDelay || "3");
+        } catch (_err) {
+          dom.baseUrl.value = "https://api.openai.com/v1";
+          dom.model.value = "gpt-4.1-mini";
+          dom.temperature.value = "0.4";
+          dom.autoNext.checked = false;
+          dom.autoDelay.value = "3";
+        }
+      }
+
+      function normalizeEndpoint(baseUrl) {
+        const cleaned = baseUrl.replace(/\/+$/, "");
+        if (cleaned.endsWith("/chat/completions")) {
+          return cleaned;
+        }
+        if (cleaned.endsWith("/v1")) {
+          return `${cleaned}/chat/completions`;
+        }
+        return `${cleaned}/v1/chat/completions`;
+      }
+
+      function randomSecretWord() {
+        const index = Math.floor(Math.random() * WORD_LIST.length);
+        return WORD_LIST[index];
+      }
+
+      function createBoard() {
+        dom.board.innerHTML = "";
+        for (let i = 0; i < MAX_ATTEMPTS; i += 1) {
+          const row = document.createElement("div");
+          row.className = "row";
+          for (let j = 0; j < 5; j += 1) {
+            const tile = document.createElement("div");
+            tile.className = "tile";
+            row.appendChild(tile);
+          }
+          dom.board.appendChild(row);
+        }
+      }
+
+      function markRow(turn, guess, statuses) {
+        const row = dom.board.children[turn - 1];
+        if (!row) return;
+        for (let i = 0; i < 5; i += 1) {
+          const tile = row.children[i];
+          tile.textContent = guess[i] || "";
+          tile.classList.add(statuses[i]);
+        }
+      }
+
+      function formatMs(ms) {
+        if (typeof ms !== "number" || Number.isNaN(ms)) return "n/a";
+        return `${Math.max(0, Math.round(ms))} ms`;
+      }
+
+      function formatTiming(timing) {
+        if (!timing) return "TTFT: n/a | Total: n/a";
+        return `TTFT: ${formatMs(timing.ttftMs)} | Total: ${formatMs(timing.totalMs)}`;
+      }
+
+      function historySummaryText() {
+        return `Correct ${state.stats.correctGuesses} | Wrong ${state.stats.wrongGuesses}`;
+      }
+
+      function parseTemperature(raw) {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return 0.4;
+        return Math.min(2, Math.max(0, n));
+      }
+
+      function renderAttempt(turn, guess, reason, pattern, valid, timing, historySummary, attemptUsed = true) {
+        const li = document.createElement("li");
+        const title = document.createElement("div");
+        title.className = "attempt-title";
+        title.textContent = attemptUsed
+          ? `Turn ${turn}: ${guess.toUpperCase()} (${pattern})`
+          : `Turn ${turn}: ${guess.toUpperCase()} (${pattern}, no attempt used)`;
+        const meta = document.createElement("p");
+        meta.className = "attempt-meta";
+        meta.textContent = `${valid ? "Reason" : "Rejected"}: ${reason || "(empty)"}`;
+        const timingMeta = document.createElement("p");
+        timingMeta.className = "attempt-meta";
+        timingMeta.textContent = `Timing: ${formatTiming(timing)}`;
+        const historyMeta = document.createElement("p");
+        historyMeta.className = "attempt-meta";
+        historyMeta.textContent = `History Count: ${historySummary}`;
+        li.append(title, meta, timingMeta, historyMeta);
+        dom.attempts.appendChild(li);
+      }
+
+      function evaluateGuess(secret, guess) {
+        const statuses = Array(5).fill("absent");
+        const remaining = {};
+
+        for (let i = 0; i < 5; i += 1) {
+          if (guess[i] === secret[i]) {
+            statuses[i] = "correct";
+          } else {
+            const letter = secret[i];
+            remaining[letter] = (remaining[letter] || 0) + 1;
+          }
+        }
+
+        for (let i = 0; i < 5; i += 1) {
+          if (statuses[i] === "correct") continue;
+          const letter = guess[i];
+          if (remaining[letter] > 0) {
+            statuses[i] = "present";
+            remaining[letter] -= 1;
+          }
+        }
+
+        const pattern = statuses
+          .map((status) => (status === "correct" ? "G" : status === "present" ? "Y" : "B"))
+          .join("");
+
+        return { statuses, pattern };
+      }
+
+      function safeJsonParse(text) {
+        try {
+          return JSON.parse(text);
+        } catch (_err) {
+          return null;
+        }
+      }
+
+      function cleanGuess(raw) {
+        return String(raw || "")
+          .toLowerCase()
+          .replace(/[^a-z]/g, "")
+          .slice(0, 5);
+      }
+
+      function buildInitialMessages() {
+        return [
+          {
+            role: "system",
+            content:
+              "You are a Wordle solver. Think in short plain text while streaming, then call tool submit_guess exactly once per turn with JSON key order {\"reason\":\"...\",\"guess\":\"...\"}. Reason must be emitted before guess. Guess must be 5 lowercase letters and selected from allowed_words."
+          },
+          {
+            role: "user",
+            content:
+              `Game starts now. You have ${MAX_ATTEMPTS} turns. Allowed words: ${WORD_LIST.join(", ")}. For every tool call, output reason first and guess second. After each tool response, update your hypothesis and call submit_guess again.`
+          }
+        ];
+      }
+
+      async function streamOneTurn(config) {
+        const requestStart = performance.now();
+        const endpoint = normalizeEndpoint(config.baseUrl);
+        const payload = {
+          model: config.model,
+          stream: true,
+          temperature: parseTemperature(config.temperature),
+          messages: state.messages,
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "submit_guess",
+                description: "Submit one Wordle guess and a concise reason.",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    reason: {
+                      type: "string",
+                      description: "Why this guess is selected right now. Must appear before guess in JSON."
+                    },
+                    guess: {
+                      type: "string",
+                      description: "One lowercase 5-letter word from allowed words list."
+                    }
+                  },
+                  required: ["reason", "guess"],
+                  additionalProperties: false
+                }
+              }
+            }
+          ],
+          tool_choice: {
+            type: "function",
+            function: {
+              name: "submit_guess"
+            }
+          }
+        };
+
+        const headers = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.apiKey}`
+        };
+
+        state.abortController = new AbortController();
+        state.currentReader = null;
+        try {
+          const res = await raceWithStop(fetch(endpoint, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+            signal: state.abortController.signal
+          }));
+
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`LLM request failed (${res.status}): ${text.slice(0, 280)}`);
+          }
+          if (!res.body) {
+            throw new Error("No response stream body returned by endpoint.");
+          }
+
+          const toolCalls = [];
+          let contentSoFar = "";
+          let reasoningSoFar = "";
+          let toolStreamStarted = false;
+          let firstTokenAt = null;
+          const decoder = new TextDecoder();
+          const reader = res.body.getReader();
+          state.currentReader = reader;
+          let buffer = "";
+          let done = false;
+          const markFirstToken = () => {
+            if (firstTokenAt === null) {
+              firstTokenAt = performance.now();
+            }
+          };
+
+          while (!done) {
+            const chunk = await raceWithStop(reader.read());
+            if (chunk.done) break;
+            buffer += decoder.decode(chunk.value, { stream: true });
+
+            let lineBreak = buffer.indexOf("\n");
+            while (lineBreak !== -1) {
+              const line = buffer.slice(0, lineBreak).trim();
+              buffer = buffer.slice(lineBreak + 1);
+
+              if (line.startsWith("data:")) {
+                const data = line.slice(5).trim();
+                if (data === "[DONE]") {
+                  done = true;
+                  break;
+                }
+                if (data) {
+                  const packet = safeJsonParse(data);
+                  const delta = packet && packet.choices && packet.choices[0] && packet.choices[0].delta;
+                  if (delta && typeof delta.content === "string" && delta.content.length > 0) {
+                    markFirstToken();
+                    contentSoFar += delta.content;
+                    appendLog(delta.content);
+                  }
+                  if (delta && typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0) {
+                    markFirstToken();
+                    reasoningSoFar += delta.reasoning_content;
+                    appendLog(delta.reasoning_content);
+                  }
+                  if (delta && typeof delta.reasoning === "string" && delta.reasoning.length > 0) {
+                    markFirstToken();
+                    reasoningSoFar += delta.reasoning;
+                    appendLog(delta.reasoning);
+                  }
+                  if (delta && Array.isArray(delta.tool_calls)) {
+                    delta.tool_calls.forEach((item) => {
+                      const idx = item.index || 0;
+                      if (!toolCalls[idx]) {
+                        toolCalls[idx] = {
+                          id: "",
+                          type: "function",
+                          function: {
+                            name: "",
+                            arguments: ""
+                          }
+                        };
+                      }
+                      if (item.id) toolCalls[idx].id = item.id;
+                      if (item.function && item.function.name) {
+                        toolCalls[idx].function.name = item.function.name;
+                      }
+                      if (item.function && typeof item.function.arguments === "string") {
+                        toolCalls[idx].function.arguments += item.function.arguments;
+                        if (!toolStreamStarted) {
+                          appendLog("\n[Tool arguments stream]\n");
+                          toolStreamStarted = true;
+                        }
+                        if (item.function.arguments.length > 0) {
+                          markFirstToken();
+                        }
+                        appendLog(item.function.arguments);
+                      }
+                    });
+                  }
+                }
+              }
+
+              lineBreak = buffer.indexOf("\n");
+            }
+          }
+
+          const call = toolCalls.find((item) => item && item.function && item.function.name === "submit_guess");
+          if (!call) {
+            throw new Error("No submit_guess tool call received.");
+          }
+
+          const parsed = safeJsonParse(call.function.arguments);
+          if (!parsed) {
+            throw new Error(`Tool call arguments are not valid JSON: ${call.function.arguments}`);
+          }
+
+          const guess = cleanGuess(parsed.guess);
+          const reason = String(parsed.reason || "").trim();
+
+          if (guess.length !== 5) {
+            throw new Error(`Tool returned invalid guess length: ${guess}`);
+          }
+
+          if (toolStreamStarted) {
+            appendLog("\n");
+          }
+
+          const thoughtCombined = [reasoningSoFar, contentSoFar].filter(Boolean).join("\n");
+          const totalMs = performance.now() - requestStart;
+
+          return {
+            guess,
+            reason,
+            thought: thoughtCombined,
+            toolCall: call,
+            timing: {
+              ttftMs: firstTokenAt === null ? null : firstTokenAt - requestStart,
+              totalMs
+            }
+          };
+        } finally {
+          state.currentReader = null;
+          state.abortController = null;
+        }
+      }
+
+      async function runGame(options = {}) {
+        const autoTriggered = Boolean(options.autoTriggered);
+        clearAutoNextTimer();
+        const config = {
+          baseUrl: dom.baseUrl.value.trim(),
+          apiKey: dom.apiKey.value.trim(),
+          model: dom.model.value.trim(),
+          temperature: dom.temperature.value.trim(),
+          autoNext: dom.autoNext.checked,
+          autoDelay: dom.autoDelay.value.trim()
+        };
+
+        if (!config.baseUrl || !config.apiKey || !config.model) {
+          setStatus("Please fill base URL, API key, and model.");
+          return;
+        }
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+        dom.startBtn.disabled = true;
+        dom.stopBtn.disabled = false;
+        dom.saveBtn.disabled = true;
+        if (autoTriggered) {
+          appendLog("\n\n===== Auto Next Game =====\n");
+        } else {
+          dom.attempts.innerHTML = "";
+          dom.streamLog.textContent = "";
+        }
+        createBoard();
+
+        state.running = true;
+        state.stopRequested = false;
+        state.stopWaiters.clear();
+        state.secret = randomSecretWord();
+        state.messages = buildInitialMessages();
+        state.attemptCount = 0;
+        let outcome = "running";
+
+        setStatus("Game running. Streaming assistant output...");
+
+        try {
+          while (state.running && state.attemptCount < MAX_ATTEMPTS) {
+            const turn = state.attemptCount + 1;
+            appendLog(`\n\n[Turn ${turn}]\n`);
+
+            const turnResult = await streamOneTurn(config);
+            const guess = turnResult.guess;
+            const valid = WORD_SET.has(guess);
+            appendLog(`\n[Timing] ${formatTiming(turnResult.timing)}\n`);
+
+            if (valid) {
+              const { statuses, pattern } = evaluateGuess(state.secret, guess);
+              const solved = guess === state.secret;
+              if (solved) {
+                state.stats.correctGuesses += 1;
+              } else {
+                state.stats.wrongGuesses += 1;
+              }
+              saveStats();
+              const historySummary = historySummaryText();
+              appendLog(`[History Count] ${historySummary}\n`);
+              markRow(turn, guess, statuses);
+              renderAttempt(turn, guess, turnResult.reason, pattern, true, turnResult.timing, historySummary);
+
+              state.messages.push({
+                role: "assistant",
+                content: turnResult.thought,
+                tool_calls: [
+                  {
+                    id: turnResult.toolCall.id,
+                    type: "function",
+                    function: {
+                      name: "submit_guess",
+                      arguments: turnResult.toolCall.function.arguments
+                    }
+                  }
+                ]
+              });
+
+              state.messages.push({
+                role: "tool",
+                tool_call_id: turnResult.toolCall.id,
+                content: JSON.stringify({
+                  guess,
+                  pattern,
+                  positions: statuses,
+                  solved: guess === state.secret,
+                  note: "G = correct place, Y = letter exists elsewhere, B = letter absent"
+                })
+              });
+
+              state.attemptCount += 1;
+
+              if (solved) {
+                setStatus(`Solved in ${turn} turns. Secret word: ${state.secret.toUpperCase()}.`);
+                state.running = false;
+                outcome = "win";
+                break;
+              }
+            } else {
+              const rejectReason = turnResult.reason || "Guess not in allowed list.";
+              const historySummary = historySummaryText();
+              appendLog("[Invalid Guess] Not in allowed words. Attempt not consumed.\n");
+              appendLog(`[History Count] ${historySummary}\n`);
+              renderAttempt(turn, guess, rejectReason, "INVALID", false, turnResult.timing, historySummary, false);
+
+              state.messages.push({
+                role: "assistant",
+                content: turnResult.thought,
+                tool_calls: [
+                  {
+                    id: turnResult.toolCall.id,
+                    type: "function",
+                    function: {
+                      name: "submit_guess",
+                      arguments: turnResult.toolCall.function.arguments
+                    }
+                  }
+                ]
+              });
+
+              state.messages.push({
+                role: "tool",
+                tool_call_id: turnResult.toolCall.id,
+                content: JSON.stringify({
+                  guess,
+                  error: "Guess must be from allowed_words exactly. This input is invalid and does not consume an attempt.",
+                  consumes_attempt: false,
+                  turn,
+                  attempts_used: state.attemptCount,
+                  attempts_remaining: MAX_ATTEMPTS - state.attemptCount,
+                  allowed_words: WORD_LIST
+                })
+              });
+              continue;
+            }
+          }
+
+          if (state.running && state.attemptCount >= MAX_ATTEMPTS) {
+            setStatus(`No solve in ${MAX_ATTEMPTS} turns. Secret word: ${state.secret.toUpperCase()}.`);
+            state.running = false;
+            outcome = "loss";
+          }
+          if (!state.running && !state.secret) {
+            setStatus("Stopped.");
+            outcome = "stopped";
+          }
+        } catch (err) {
+          if (err && err.name === "AbortError") {
+            setStatus("Stopped.");
+            outcome = "stopped";
+          } else {
+            const message = String(err.message || err);
+            setStatus(`Error: ${message}`);
+            outcome = "error";
+          }
+        } finally {
+          if (outcome === "win" || outcome === "loss") {
+            state.stats.games += 1;
+            if (outcome === "win") {
+              state.stats.wins += 1;
+            } else {
+              state.stats.losses += 1;
+            }
+            saveStats();
+            scheduleAutoNext();
+          } else {
+            renderStats();
+          }
+          state.abortController = null;
+          state.currentReader = null;
+          dom.startBtn.disabled = false;
+          dom.stopBtn.disabled = true;
+          dom.saveBtn.disabled = false;
+        }
+      }
+
+      function stopGame() {
+        clearAutoNextTimer();
+        state.stopRequested = true;
+        notifyStopWaiters();
+        state.running = false;
+        state.secret = "";
+        if (state.abortController) {
+          state.abortController.abort();
+        }
+        if (state.currentReader) {
+          try {
+            state.currentReader.cancel("stopped");
+          } catch (_err) {
+          }
+        }
+        setStatus("Stopping...");
+      }
+
+      dom.startBtn.addEventListener("click", () => {
+        runGame({ autoTriggered: false });
+      });
+      dom.stopBtn.addEventListener("click", stopGame);
+      dom.saveBtn.addEventListener("click", saveConfig);
+
+      loadConfig();
+      loadStats();
+      createBoard();
+      appendLog("Ready. Click Start New Game.\n");
+      appendLog(`Word list loaded: ${WORD_LIST.length} words.\n`);
+    </script>
+  </body>
+</html>
