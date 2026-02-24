@@ -98,12 +98,41 @@
         color: var(--muted);
       }
 
-      input {
+      input,
+      select {
         width: 100%;
         border: 1px solid var(--line);
         border-radius: 10px;
         padding: 10px;
         font-size: 0.95rem;
+        background: var(--panel);
+        color: var(--ink);
+      }
+
+      input::placeholder {
+        color: var(--muted);
+      }
+
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+
+      select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        padding-right: 34px;
+        background-image:
+          linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+          linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+        background-position:
+          calc(100% - 16px) calc(50% + 1px),
+          calc(100% - 11px) calc(50% + 1px);
+        background-size: 5px 5px, 5px 5px;
+        background-repeat: no-repeat;
       }
 
       .btns {
@@ -277,7 +306,7 @@
     <main class="app">
       <section class="panel">
         <h1>LLM Wordle (Single File)</h1>
-        <p class="sub">Stream assistant reasoning, require a tool call guess every turn, and score with Wordle rules.</p>
+        <p class="sub">Stream assistant reasoning, support tool call or response parsing mode, and score with Wordle rules.</p>
       </section>
 
       <section class="panel">
@@ -301,6 +330,24 @@
           <label>
             Max Tokens
             <input id="maxTokens" type="number" min="1" step="1" value="512" placeholder="512" />
+          </label>
+          <label>
+            Turns
+            <input id="maxAttempts" type="number" min="1" max="20" step="1" value="6" placeholder="6" />
+          </label>
+          <label>
+            Processing Mode
+            <select id="processingMode">
+              <option value="tool_call">tool_call (default)</option>
+              <option value="response_parsing">response_parsing</option>
+            </select>
+          </label>
+          <label>
+            Request Build Mode
+            <select id="requestBuildMode">
+              <option value="cumulative">cumulative (default)</option>
+              <option value="last_record">last_record (latest tool result only)</option>
+            </select>
           </label>
         </div>
         <div class="btns">
@@ -340,61 +387,65 @@
       const STORAGE_KEY = "llm-wordle-config-v1";
       const STATS_STORAGE_KEY = "llm-wordle-stats-v1";
       const THEME_STORAGE_KEY = "llm-wordle-theme-v1";
-      const MAX_ATTEMPTS = 6;
+      const DEFAULT_MAX_ATTEMPTS = 6;
       const DEFAULT_MAX_TOKENS = 512;
       const DEFAULT_STREAM_MAX_LINES = 500;
       const MAX_TOOL_CALL_RETRIES_PER_TURN = 3;
+      const PROCESSING_MODE_TOOL_CALL = "tool_call";
+      const PROCESSING_MODE_RESPONSE_PARSING = "response_parsing";
+      const REQUEST_BUILD_MODE_CUMULATIVE = "cumulative";
+      const REQUEST_BUILD_MODE_LAST_RECORD = "last_record";
       const WORD_LIST = [
-        "about", "their", "there", "which", "would", "other", "after", "first", "think", "could",
-        "these", "where", "right", "years", "being", "going", "still", "never", "those", "world",
-        "great", "while", "every", "state", "three", "since", "under", "thing", "house", "place",
-        "again", "found", "might", "money", "night", "until", "doing", "group", "women", "start",
-        "times", "today", "point", "music", "power", "water", "based", "small", "white", "later",
-        "order", "party", "thank", "using", "black", "makes", "whole", "maybe", "story", "games",
-        "least", "means", "early", "local", "video", "young", "court", "given", "level", "often",
-        "death", "hours", "south", "known", "large", "wrong", "along", "needs", "class", "close",
-        "comes", "looks", "cause", "happy", "human", "woman", "leave", "north", "watch", "light",
-        "short", "taken", "third", "among", "check", "heart", "asked", "child", "major", "media",
-        "phone", "quite", "works", "final", "front", "ready", "bring", "heard", "march", "study",
-        "clear", "month", "words", "board", "field", "seems", "wants", "fight", "force", "issue",
-        "price", "shows", "space", "total", "above", "share", "april", "sense", "weeks", "break",
-        "event", "sorry", "takes", "girls", "guess", "learn", "added", "alone", "hands", "movie",
-        "press", "tried", "worth", "areas", "books", "sound", "value", "lives", "round", "stand",
-        "stuff", "drive", "green", "match", "model", "trust", "range", "trade", "chief", "lower",
-        "style", "blood", "stage", "terms", "title", "enjoy", "cover", "legal", "seven", "staff",
-        "super", "union", "began", "built", "crazy", "daily", "knows", "paper", "parts", "voice",
-        "whose", "earth", "rules", "below", "offer", "sleep", "table", "truth", "build", "cases",
-        "piece", "visit", "wrote", "gives", "river", "shall", "speak", "write", "album", "eight",
-        "funny", "peace", "sales", "spent", "store", "track", "ahead", "allow", "brown", "moved",
-        "plans", "radio", "cross", "focus", "loved", "miles", "speed", "extra", "quick", "agree",
-        "clean", "photo", "scene", "spend", "teams", "coach", "costs", "heavy", "train", "claim",
-        "goals", "hotel", "judge", "lines", "named", "brain", "floor", "image", "meant", "reach",
-        "civil", "dance", "stock", "worst", "beach", "ended", "older", "calls", "color", "dream",
-        "grand", "names", "sweet", "touch", "doubt", "drink", "feels", "shown", "basic", "carry",
-        "crime", "fully", "plant", "worse", "award", "block", "lived", "rates", "avoid", "catch",
-        "coast", "trial", "truly", "queen", "stars", "broke", "glass", "prior", "royal", "serve",
-        "types", "begin", "ideas", "notes", "plays", "songs", "twice", "worry", "brand", "count",
-        "fresh", "mouth", "owner", "scale", "score", "smart", "throw", "views", "click", "faith",
-        "metal", "agent", "apply", "basis", "enter", "prime", "waste", "weird", "adult", "grade",
-        "stone", "users", "apart", "aware", "fifth", "items", "proud", "tells", "birth", "drugs",
-        "labor", "lucky", "prove", "tough", "units", "alive", "apple", "cards", "dress", "horse",
-        "liked", "magic", "owned", "stick", "turns", "cells", "guide", "raise", "treat", "yours",
-        "youth", "funds", "helps", "sites", "exist", "forms", "guard", "likes", "shoot", "sides",
-        "solid", "sport", "steps", "taste", "facts", "hello", "links", "plane", "shape", "upper",
-        "cheap", "joint", "signs", "steel", "tired", "crowd", "enemy", "fixed", "limit", "ocean",
-        "proof", "asian", "banks", "chair", "homes", "honor", "noted", "trees", "email", "stuck",
-        "sugar", "drama", "entry", "grant", "grown", "heads", "keeps", "lying", "route", "saved",
-        "shoes", "smoke", "squad", "teach", "tests", "abuse", "angry", "laugh", "loves", "lunch",
-        "storm", "actor", "chain", "equal", "leads", "posts", "quiet", "split", "taxes", "urban",
-        "fault", "films", "mixed", "phase", "smile", "truck", "votes", "blame", "dying", "falls",
-        "false", "fired", "novel", "shirt", "shots", "cream", "giant", "mayor", "minor", "pages",
-        "theme", "usual", "voted", "walls", "draft", "drunk", "finds", "spoke", "talks", "upset",
-        "birds", "cycle", "goods", "holds", "armed", "aside", "deals", "empty", "faces", "folks",
-        "moves", "prize", "rural", "tools", "admit", "favor", "frame", "guest", "teeth", "bunch",
-        "fruit", "index", "shift", "stood", "tight", "crown", "grace", "rooms", "chose", "crash",
-        "depth", "dirty", "error", "noise", "panel", "plate", "roads", "shame", "ships", "bible",
-        "cable", "dates", "doors", "irish", "multi", "print", "sight", "broad", "drawn", "motor",
-        "seats", "solar", "tries", "balls", "bills", "blind", "brief", "chest", "debut", "paint",
+        "about", "their", "would", "other", "after", "first", "think", "could", "right", "being",
+        "those", "world", "great", "while", "since", "under", "thing", "house", "place", "found",
+        "might", "money", "night", "until", "doing", "group", "women", "today", "point", "music",
+        "power", "water", "based", "white", "later", "party", "thank", "using", "black", "whole",
+        "maybe", "story", "least", "early", "video", "young", "court", "given", "often", "death",
+        "south", "large", "wrong", "along", "close", "cause", "human", "woman", "north", "watch",
+        "light", "short", "taken", "third", "among", "heart", "asked", "child", "major", "media",
+        "phone", "quite", "final", "front", "ready", "bring", "heard", "march", "study", "clear",
+        "month", "board", "field", "fight", "force", "price", "space", "above", "share", "april",
+        "break", "learn", "alone", "movie", "tried", "worth", "sound", "value", "round", "stand",
+        "drive", "match", "model", "range", "trade", "chief", "lower", "style", "stage", "enjoy",
+        "cover", "super", "began", "built", "crazy", "daily", "voice", "whose", "earth", "below",
+        "table", "build", "wrote", "speak", "write", "album", "eight", "spent", "store", "track",
+        "brown", "moved", "radio", "loved", "extra", "quick", "clean", "spend", "heavy", "train",
+        "claim", "hotel", "judge", "named", "brain", "image", "meant", "reach", "dance", "stock",
+        "worst", "beach", "older", "dream", "grand", "touch", "doubt", "drink", "shown", "basic",
+        "crime", "plant", "worse", "block", "lived", "avoid", "coast", "trial", "truly", "broke",
+        "royal", "begin", "twice", "brand", "count", "fresh", "mouth", "owner", "scale", "score",
+        "smart", "throw", "faith", "metal", "agent", "prime", "waste", "weird", "adult", "grade",
+        "stone", "proud", "birth", "labor", "lucky", "prove", "tough", "alive", "horse", "liked",
+        "magic", "owned", "stick", "guide", "raise", "youth", "exist", "guard", "solid", "sport",
+        "plane", "shape", "cheap", "joint", "tired", "crowd", "fixed", "ocean", "chair", "noted",
+        "email", "stuck", "sugar", "entry", "grant", "grown", "lying", "route", "saved", "smoke",
+        "squad", "teach", "abuse", "angry", "laugh", "lunch", "storm", "actor", "chain", "equal",
+        "quiet", "split", "urban", "fault", "mixed", "phase", "smile", "truck", "blame", "dying",
+        "false", "fired", "novel", "shirt", "cream", "giant", "mayor", "minor", "voted", "draft",
+        "drunk", "spoke", "upset", "armed", "aside", "empty", "prize", "admit", "favor", "frame",
+        "guest", "bunch", "fruit", "index", "shift", "crown", "grace", "chose", "crash", "depth",
+        "dirty", "noise", "panel", "plate", "shame", "cable", "multi", "print", "sight", "broad",
+        "drawn", "solar", "blind", "brief", "chest", "debut", "paint", "forum", "reply", "topic",
+        "login", "quote", "poker", "audio", "china", "linux", "flash", "smith", "nokia", "italy",
+        "rated", "input", "valid", "spain", "suite", "naked", "buyer", "patch", "saint", "admin",
+        "mount", "latin", "chart", "laser", "mouse", "alert", "diego", "frank", "anime", "query",
+        "filed", "korea", "brian", "intel", "henry", "delta", "adobe", "layer", "ratio", "maine",
+        "ideal", "usage", "angel", "width", "sharp", "kevin", "logic", "plain", "costa", "trail",
+        "setup", "scope", "mysql", "slide", "exact", "bound", "micro", "delay", "pilot", "ultra",
+        "idaho", "lodge", "clark", "newly", "audit", "tower", "jason", "const", "forth", "bruce",
+        "egypt", "simon", "piano", "rapid", "hairy", "dutch", "pulse", "metro", "strip", "pearl",
+        "honda", "opera", "blank", "humor", "roman", "angle", "vinyl", "nurse", "maker", "craft",
+        "epson", "wayne", "ridge", "trend", "rhode", "busty", "fiber", "graph", "fraud", "inter",
+        "grove", "spray", "yield", "diary", "baker", "shock", "ebony", "beast", "globe", "dicke",
+        "ghost", "pride", "keith", "linda", "chile", "quest", "vital", "thick", "vista", "candy",
+        "tiger", "moral", "pound", "bread", "craig", "solve", "glory", "saudi", "karen", "rugby",
+        "fluid", "devil", "marie", "kenya", "sized", "swing", "gnome", "noble", "shore", "horny",
+        "ralph", "liver", "decor", "alice", "intro", "clerk", "sigma", "xhtml", "trace", "rough",
+        "blade", "robin", "strap", "cloud", "knife", "shelf", "adopt", "outer", "islam", "cited",
+        "skype", "steam", "acute", "carol", "stack", "curve", "amber", "trunk", "camel", "juice",
+        "chase", "sauce", "proxy", "slave", "zdnet", "haven", "charm", "basin", "ranch", "toner",
+        "latex", "delhi", "alien", "nepal", "rocky", "omega", "saver", "grain", "salon", "turbo",
+        "aimed", "brush", "spare", "skirt", "honey", "faced", "sixth", "cheat", "sandy", "macro"
       ];
       const WORD_SET = new Set(WORD_LIST);
 
@@ -404,6 +455,9 @@
         model: document.getElementById("model"),
         temperature: document.getElementById("temperature"),
         maxTokens: document.getElementById("maxTokens"),
+        maxAttempts: document.getElementById("maxAttempts"),
+        processingMode: document.getElementById("processingMode"),
+        requestBuildMode: document.getElementById("requestBuildMode"),
         autoNext: document.getElementById("autoNext"),
         autoDelay: document.getElementById("autoDelay"),
         streamMaxLines: document.getElementById("streamMaxLines"),
@@ -422,7 +476,9 @@
         running: false,
         secret: "",
         messages: [],
+        lastFeedbackUserMessage: "",
         attemptCount: 0,
+        maxAttempts: DEFAULT_MAX_ATTEMPTS,
         triedGuesses: [],
         feedbackFacts: {
           confirmedPositions: Array(5).fill(null),
@@ -645,6 +701,9 @@
           model: dom.model.value.trim(),
           temperature: dom.temperature.value.trim(),
           maxTokens: dom.maxTokens.value.trim(),
+          maxAttempts: dom.maxAttempts.value.trim(),
+          processingMode: normalizeProcessingMode(dom.processingMode.value),
+          requestBuildMode: normalizeRequestBuildMode(dom.requestBuildMode.value),
           autoNext: dom.autoNext.checked,
           autoDelay: dom.autoDelay.value.trim(),
           streamMaxLines: dom.streamMaxLines.value.trim()
@@ -660,6 +719,9 @@
           dom.model.value = "gpt-4.1-mini";
           dom.temperature.value = "0.4";
           dom.maxTokens.value = String(DEFAULT_MAX_TOKENS);
+          dom.maxAttempts.value = String(DEFAULT_MAX_ATTEMPTS);
+          dom.processingMode.value = PROCESSING_MODE_TOOL_CALL;
+          dom.requestBuildMode.value = REQUEST_BUILD_MODE_CUMULATIVE;
           dom.autoNext.checked = false;
           dom.autoDelay.value = "3";
           dom.streamMaxLines.value = String(DEFAULT_STREAM_MAX_LINES);
@@ -672,6 +734,9 @@
           dom.model.value = config.model || "gpt-4.1-mini";
           dom.temperature.value = String(config.temperature || "0.4");
           dom.maxTokens.value = String(config.maxTokens || DEFAULT_MAX_TOKENS);
+          dom.maxAttempts.value = String(parseMaxAttempts(config.maxAttempts));
+          dom.processingMode.value = normalizeProcessingMode(config.processingMode);
+          dom.requestBuildMode.value = normalizeRequestBuildMode(config.requestBuildMode);
           dom.autoNext.checked = Boolean(config.autoNext);
           dom.autoDelay.value = String(config.autoDelay || "3");
           dom.streamMaxLines.value = String(parseStreamMaxLines(config.streamMaxLines));
@@ -680,10 +745,25 @@
           dom.model.value = "gpt-4.1-mini";
           dom.temperature.value = "0.4";
           dom.maxTokens.value = String(DEFAULT_MAX_TOKENS);
+          dom.maxAttempts.value = String(DEFAULT_MAX_ATTEMPTS);
+          dom.processingMode.value = PROCESSING_MODE_TOOL_CALL;
+          dom.requestBuildMode.value = REQUEST_BUILD_MODE_CUMULATIVE;
           dom.autoNext.checked = false;
           dom.autoDelay.value = "3";
           dom.streamMaxLines.value = String(DEFAULT_STREAM_MAX_LINES);
         }
+      }
+
+      function normalizeProcessingMode(rawMode) {
+        return rawMode === PROCESSING_MODE_RESPONSE_PARSING
+          ? PROCESSING_MODE_RESPONSE_PARSING
+          : PROCESSING_MODE_TOOL_CALL;
+      }
+
+      function normalizeRequestBuildMode(rawMode) {
+        return rawMode === REQUEST_BUILD_MODE_LAST_RECORD
+          ? REQUEST_BUILD_MODE_LAST_RECORD
+          : REQUEST_BUILD_MODE_CUMULATIVE;
       }
 
       function normalizeEndpoint(baseUrl) {
@@ -702,9 +782,10 @@
         return WORD_LIST[index];
       }
 
-      function createBoard() {
+      function createBoard(maxAttempts = DEFAULT_MAX_ATTEMPTS) {
+        const rowCount = parseMaxAttempts(maxAttempts);
         dom.board.innerHTML = "";
-        for (let i = 0; i < MAX_ATTEMPTS; i += 1) {
+        for (let i = 0; i < rowCount; i += 1) {
           const row = document.createElement("div");
           row.className = "row";
           for (let j = 0; j < 5; j += 1) {
@@ -906,6 +987,12 @@
         return Math.max(1, Math.round(n));
       }
 
+      function parseMaxAttempts(raw) {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return DEFAULT_MAX_ATTEMPTS;
+        return Math.max(1, Math.min(20, Math.round(n)));
+      }
+
       function parseStreamMaxLines(raw) {
         const n = Number(raw);
         if (!Number.isFinite(n)) return DEFAULT_STREAM_MAX_LINES;
@@ -984,62 +1071,267 @@
           .slice(0, 5);
       }
 
-      function buildInitialMessages() {
+      function classifyTurnFailure(rawMessage) {
+        const message = String(rawMessage || "").toLowerCase();
+        if (message.includes("no submit_guess tool call")) {
+          return "missing_tool_call";
+        }
+        if (message.includes("tool call arguments are not valid json")) {
+          return "invalid_tool_json";
+        }
+        if (message.includes("tool returned invalid guess length")) {
+          return "invalid_guess_length";
+        }
+        if (message.includes("no <wordle_choice> block found")) {
+          return "missing_wordle_choice";
+        }
+        if (message.includes("response parsing extracted invalid guess length")) {
+          return "invalid_guess_length";
+        }
+        return null;
+      }
+
+      function buildRetryUserMessage(failure, processingMode) {
+        if (!failure || !failure.type) return "";
+        if (processingMode === PROCESSING_MODE_TOOL_CALL && failure.type === "max_tokens_without_tool_call") {
+          return `Previous turn failed because response was too long and reached max_tokens=${failure.maxTokens} (finish_reason=${failure.finishReason}) before submit_guess tool call. Keep reasoning short and call submit_guess exactly once with valid JSON key order {"reason":"...","guess":"....."} where guess is 5 lowercase letters.`;
+        }
+        if (processingMode === PROCESSING_MODE_TOOL_CALL && failure.type === "missing_tool_call") {
+          return "Previous turn failed because no submit_guess tool call was emitted. In this turn, call submit_guess exactly once with valid JSON key order {\"reason\":\"...\",\"guess\":\".....\"}, and keep guess to 5 lowercase letters.";
+        }
+        if (processingMode === PROCESSING_MODE_TOOL_CALL && failure.type === "invalid_tool_json") {
+          return "Previous turn failed because submit_guess arguments were not valid JSON. In this turn, call submit_guess exactly once with strict JSON key order {\"reason\":\"...\",\"guess\":\".....\"}.";
+        }
+        if (processingMode === PROCESSING_MODE_RESPONSE_PARSING && failure.type === "missing_wordle_choice") {
+          return "Previous turn failed because output had no <wordle_choice><reason></reason><guess></guess></wordle_choice> block. In this turn, include exactly one such block and keep guess to 5 lowercase letters.";
+        }
+        if (failure.type === "invalid_guess_length") {
+          if (processingMode === PROCESSING_MODE_RESPONSE_PARSING) {
+            return "Previous turn failed because parsed guess was not exactly 5 lowercase letters. In this turn, output exactly one <wordle_choice> block and keep <guess> as a 5-letter lowercase word.";
+          }
+          return "Previous turn failed because submit_guess.guess was not exactly 5 lowercase letters. In this turn, call submit_guess exactly once and ensure guess is a 5-letter lowercase word.";
+        }
+        return "";
+      }
+
+      function getSystemPromptByMode(processingMode) {
+        if (processingMode === PROCESSING_MODE_RESPONSE_PARSING) {
+          return "You are a Wordle solver. Think in short plain text while streaming. At the end of every turn, output exactly one XML block in this structure: <wordle_choice><reason>...</reason><guess>.....</guess></wordle_choice>. reason must appear before guess. guess must be a 5-letter lowercase English word. Do not output tool calls. Follow Wordle rules strictly: G means exact position is fixed; Y means the letter is in the word but not in that position; B means no unmatched copy remains for that guess after applying G/Y counts. Repeated letters are allowed, and a letter can appear multiple times in the secret. Never reject a candidate only because it repeats a letter. If one candidate fits all known constraints, guess it.";
+        }
+        return "You are a Wordle solver. Think in short plain text while streaming, then call tool submit_guess exactly once per turn with JSON key order {\"reason\":\"...\",\"guess\":\"...\"}. Reason must be emitted before guess. Guess must be a 5-letter lowercase English word. Follow Wordle rules strictly: G means exact position is fixed; Y means the letter is in the word but not in that position; B means no unmatched copy remains for that guess after applying G/Y counts. Repeated letters are allowed, and a letter can appear multiple times in the secret. Never reject a candidate only because it repeats a letter. If one candidate fits all known constraints, guess it.";
+      }
+
+      function getGameStartPromptByMode(processingMode, maxAttempts) {
+        if (processingMode === PROCESSING_MODE_RESPONSE_PARSING) {
+          return `Game starts now. You have ${maxAttempts} turns. Guess common English 5-letter words. In each turn, include exactly one <wordle_choice><reason></reason><guess></guess></wordle_choice> block. After each user feedback message, update your hypothesis and output the next block. Never repeat a guess that already appears in guess_history.`;
+        }
+        return `Game starts now. You have ${maxAttempts} turns. Guess common English 5-letter words. For every tool call, output reason first and guess second. After each tool response, update your hypothesis and call submit_guess again. Tool response includes guess_history. Never repeat a guess that already appears in guess_history.`;
+      }
+
+      function buildInitialMessages(processingMode, maxAttempts) {
+        const mode = normalizeProcessingMode(processingMode);
+        const sanitizedMaxAttempts = parseMaxAttempts(maxAttempts);
         return [
           {
             role: "system",
-            content:
-              "You are a Wordle solver. Think in short plain text while streaming, then call tool submit_guess exactly once per turn with JSON key order {\"reason\":\"...\",\"guess\":\"...\"}. Reason must be emitted before guess. Guess must be a 5-letter lowercase English word. Follow Wordle rules strictly: G means exact position is fixed; Y means the letter is in the word but not in that position; B means no unmatched copy remains for that guess after applying G/Y counts. Repeated letters are allowed, and a letter can appear multiple times in the secret. Never reject a candidate only because it repeats a letter. If one candidate fits all known constraints, guess it."
+            content: getSystemPromptByMode(mode)
           },
           {
             role: "user",
-            content:
-              `Game starts now. You have ${MAX_ATTEMPTS} turns. Guess common English 5-letter words. For every tool call, output reason first and guess second. After each tool response, update your hypothesis and call submit_guess again. Tool response includes guess_history. Never repeat a guess that already appears in guess_history.`
+            content: getGameStartPromptByMode(mode, sanitizedMaxAttempts)
           }
         ];
       }
 
-      async function streamOneTurn(config) {
+      function buildToolSpec() {
+        return [
+          {
+            type: "function",
+            function: {
+              name: "submit_guess",
+              description: "Submit one Wordle guess and a concise reason.",
+              parameters: {
+                type: "object",
+                properties: {
+                  reason: {
+                    type: "string",
+                    description: "Why this guess is selected right now. Must appear before guess in JSON."
+                  },
+                  guess: {
+                    type: "string",
+                    description: "One lowercase 5-letter common English word."
+                  }
+                },
+                required: ["reason", "guess"],
+                additionalProperties: false
+              }
+            }
+          }
+        ];
+      }
+
+      function parseGuessFromToolCalls(toolCalls, maxTokens, finishReason, usage) {
+        const call = toolCalls.find((item) => item && item.function && item.function.name === "submit_guess");
+        if (!call) {
+          const hitMaxTokens = finishReason === "length" || Boolean(usage && usage.output >= maxTokens);
+          if (hitMaxTokens) {
+            return {
+              retryableNoToolCall: true,
+              maxTokens,
+              finishReason: finishReason || "unknown"
+            };
+          }
+          throw new Error("No submit_guess tool call received.");
+        }
+
+        const parsed = safeJsonParse(call.function.arguments);
+        if (!parsed) {
+          throw new Error(`Tool call arguments are not valid JSON: ${call.function.arguments}`);
+        }
+
+        const guess = cleanGuess(parsed.guess);
+        const reason = String(parsed.reason || "").trim();
+        if (guess.length !== 5) {
+          throw new Error(`Tool returned invalid guess length: ${guess}`);
+        }
+        return { guess, reason, toolCall: call };
+      }
+
+      function parseGuessFromResponseText(rawText) {
+        const text = String(rawText || "");
+        const match = text.match(
+          /<wordle_choice>\s*<reason>([\s\S]*?)<\/reason>\s*<guess>([\s\S]*?)<\/guess>\s*<\/wordle_choice>/i
+        );
+        if (!match) {
+          throw new Error("No <wordle_choice> block found in response.");
+        }
+        const reason = String(match[1] || "").trim();
+        const guess = cleanGuess(match[2]);
+        if (guess.length !== 5) {
+          throw new Error(`Response parsing extracted invalid guess length: ${guess}`);
+        }
+        return { guess, reason };
+      }
+
+      function isLikelyToolUnsupportedMessage(rawMessage) {
+        const message = String(rawMessage || "").toLowerCase();
+        return (
+          message.includes("does not support this tool_choice") ||
+          message.includes("does not support tool_choice") ||
+          message.includes("does not support tools") ||
+          message.includes("tools are not supported") ||
+          message.includes("unsupported parameter: tools") ||
+          message.includes("unsupported parameter: tool_choice") ||
+          message.includes("unrecognized request argument supplied: tools") ||
+          message.includes("unrecognized request argument supplied: tool_choice") ||
+          message.includes("function call is not supported") ||
+          message.includes("function calling is not supported")
+        );
+      }
+
+      function buildResponseFeedbackMessage(feedback, processingMode) {
+        const mode = normalizeProcessingMode(processingMode);
+        if (mode === PROCESSING_MODE_RESPONSE_PARSING) {
+          return `Wordle feedback: ${JSON.stringify(feedback)}\nContinue reasoning, then output exactly one <wordle_choice><reason></reason><guess></guess></wordle_choice> block.`;
+        }
+        return JSON.stringify(feedback);
+      }
+
+      function pushAssistantTurnMessage(turnResult, processingMode) {
+        const mode = normalizeProcessingMode(processingMode);
+        if (mode === PROCESSING_MODE_TOOL_CALL) {
+          state.messages.push({
+            role: "assistant",
+            content: turnResult.thought,
+            tool_calls: [
+              {
+                id: turnResult.toolCall.id,
+                type: "function",
+                function: {
+                  name: "submit_guess",
+                  arguments: turnResult.toolCall.function.arguments
+                }
+              }
+            ]
+          });
+          return;
+        }
+        state.messages.push({
+          role: "assistant",
+          content: turnResult.assistantText || turnResult.thought || ""
+        });
+      }
+
+      function pushFeedbackMessage(turnResult, processingMode, feedbackPayload) {
+        const mode = normalizeProcessingMode(processingMode);
+        let userMessageContent = "";
+        if (mode === PROCESSING_MODE_TOOL_CALL) {
+          userMessageContent = JSON.stringify(feedbackPayload);
+          state.messages.push({
+            role: "tool",
+            tool_call_id: turnResult.toolCall.id,
+            content: userMessageContent
+          });
+        } else {
+          userMessageContent = buildResponseFeedbackMessage(feedbackPayload, mode);
+          state.messages.push({
+            role: "user",
+            content: userMessageContent
+          });
+        }
+        state.lastFeedbackUserMessage = userMessageContent;
+      }
+
+      function buildRequestMessages(processingMode, requestBuildMode) {
+        const mode = normalizeProcessingMode(processingMode);
+        const buildMode = normalizeRequestBuildMode(requestBuildMode);
+        if (buildMode === REQUEST_BUILD_MODE_CUMULATIVE) {
+          return state.messages;
+        }
+        const messages = [
+          {
+            role: "system",
+            content: getSystemPromptByMode(mode)
+          }
+        ];
+        const userMessageContent = state.lastFeedbackUserMessage || getGameStartPromptByMode(mode);
+        messages.push({
+          role: "user",
+          content: userMessageContent
+        });
+        return messages;
+      }
+
+      async function streamOneTurn(config, processingMode, requestBuildMode) {
+        const mode = normalizeProcessingMode(processingMode);
+        const buildMode = normalizeRequestBuildMode(requestBuildMode);
         const requestStart = performance.now();
         const endpoint = normalizeEndpoint(config.baseUrl);
         const maxTokens = parseMaxTokens(config.maxTokens);
+        const requestMessages = buildRequestMessages(mode, buildMode);
         const payload = {
           model: config.model,
           stream: true,
           temperature: parseTemperature(config.temperature),
           max_tokens: maxTokens,
-          messages: state.messages,
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "submit_guess",
-                description: "Submit one Wordle guess and a concise reason.",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    reason: {
-                      type: "string",
-                      description: "Why this guess is selected right now. Must appear before guess in JSON."
-                    },
-                    guess: {
-                      type: "string",
-                      description: "One lowercase 5-letter common English word."
-                    }
-                  },
-                  required: ["reason", "guess"],
-                  additionalProperties: false
-                }
-              }
-            }
-          ],
-          tool_choice: {
+          messages: requestMessages
+        };
+        if (mode === PROCESSING_MODE_TOOL_CALL) {
+          payload.tools = buildToolSpec();
+          payload.tool_choice = {
             type: "function",
             function: {
               name: "submit_guess"
             }
-          }
-        };
+          };
+        }
+        // Defensive guard: never allow empty stop sequences to be sent.
+        if (Object.prototype.hasOwnProperty.call(payload, "stop")) {
+          delete payload.stop;
+        }
+        appendLog(
+          `[Request] mode=${mode} requestBuild=${buildMode} msgCount=${requestMessages.length} hasTools=${Array.isArray(payload.tools)} hasToolChoice=${Boolean(payload.tool_choice)} hasStop=${Object.prototype.hasOwnProperty.call(payload, "stop")}\n`
+        );
 
         const headers = {
           "Content-Type": "application/json",
@@ -1058,7 +1350,10 @@
 
           if (!res.ok) {
             const text = await res.text();
-            throw new Error(`LLM request failed (${res.status}): ${text.slice(0, 280)}`);
+            const err = new Error(`LLM request failed (${res.status}): ${text.slice(0, 280)}`);
+            err.httpStatus = res.status;
+            err.responseText = text;
+            throw err;
           }
           if (!res.body) {
             throw new Error("No response stream body returned by endpoint.");
@@ -1167,49 +1462,38 @@
             }
           }
 
-          const call = toolCalls.find((item) => item && item.function && item.function.name === "submit_guess");
-          if (!call) {
-            const hitMaxTokens = finishReason === "length" || Boolean(usage && usage.output >= maxTokens);
-            if (hitMaxTokens) {
-              return {
-                retryableNoToolCall: true,
-                reason: "Reached max tokens without receiving submit_guess tool call.",
-                maxTokens,
-                finishReason: finishReason || "unknown",
-                timing: {
-                  ttftMs: firstTokenAt === null ? null : firstTokenAt - requestStart,
-                  totalMs: performance.now() - requestStart
-                },
-                usage
-              };
-            }
-            throw new Error("No submit_guess tool call received.");
-          }
-
-          const parsed = safeJsonParse(call.function.arguments);
-          if (!parsed) {
-            throw new Error(`Tool call arguments are not valid JSON: ${call.function.arguments}`);
-          }
-
-          const guess = cleanGuess(parsed.guess);
-          const reason = String(parsed.reason || "").trim();
-
-          if (guess.length !== 5) {
-            throw new Error(`Tool returned invalid guess length: ${guess}`);
-          }
-
           if (toolStreamStarted) {
             appendLog("\n");
           }
 
           const thoughtCombined = [reasoningSoFar, contentSoFar].filter(Boolean).join("\n");
           const totalMs = performance.now() - requestStart;
+          let parsedChoice = null;
+          if (mode === PROCESSING_MODE_TOOL_CALL) {
+            parsedChoice = parseGuessFromToolCalls(toolCalls, maxTokens, finishReason, usage);
+            if (parsedChoice.retryableNoToolCall) {
+              return {
+                retryableNoToolCall: true,
+                reason: "Reached max tokens without receiving submit_guess tool call.",
+                maxTokens: parsedChoice.maxTokens,
+                finishReason: parsedChoice.finishReason,
+                timing: {
+                  ttftMs: firstTokenAt === null ? null : firstTokenAt - requestStart,
+                  totalMs
+                },
+                usage
+              };
+            }
+          } else {
+            parsedChoice = parseGuessFromResponseText(contentSoFar || thoughtCombined);
+          }
 
           return {
-            guess,
-            reason,
+            guess: parsedChoice.guess,
+            reason: parsedChoice.reason,
             thought: thoughtCombined,
-            toolCall: call,
+            assistantText: contentSoFar,
+            toolCall: parsedChoice.toolCall || null,
             timing: {
               ttftMs: firstTokenAt === null ? null : firstTokenAt - requestStart,
               totalMs
@@ -1231,6 +1515,9 @@
           model: dom.model.value.trim(),
           temperature: dom.temperature.value.trim(),
           maxTokens: dom.maxTokens.value.trim(),
+          maxAttempts: dom.maxAttempts.value.trim(),
+          processingMode: normalizeProcessingMode(dom.processingMode.value),
+          requestBuildMode: normalizeRequestBuildMode(dom.requestBuildMode.value),
           autoNext: dom.autoNext.checked,
           autoDelay: dom.autoDelay.value.trim(),
           streamMaxLines: dom.streamMaxLines.value.trim()
@@ -1251,23 +1538,29 @@
         } else {
           dom.streamLog.textContent = "";
         }
-        createBoard();
+        const maxAttempts = parseMaxAttempts(config.maxAttempts);
+        state.maxAttempts = maxAttempts;
+        dom.maxAttempts.value = String(maxAttempts);
+        createBoard(maxAttempts);
 
         state.running = true;
         state.stopRequested = false;
         state.stopWaiters.clear();
         state.secret = randomSecretWord();
-        state.messages = buildInitialMessages();
+        state.messages = buildInitialMessages(config.processingMode, state.maxAttempts);
+        state.lastFeedbackUserMessage = "";
         state.attemptCount = 0;
         state.triedGuesses = [];
         state.feedbackFacts = createEmptyFeedbackFacts();
         state.gameUsage = createEmptyUsage();
+        const activeProcessingMode = config.processingMode;
+        const activeRequestBuildMode = config.requestBuildMode;
         let outcome = "running";
 
         setStatus("Game running. Streaming assistant output...");
 
         try {
-          while (state.running && state.attemptCount < MAX_ATTEMPTS) {
+          while (state.running && state.attemptCount < state.maxAttempts) {
             const turn = state.attemptCount + 1;
             appendLog(`\n\n[Turn ${turn}]\n`);
 
@@ -1275,7 +1568,7 @@
             let retryCount = 0;
             while (true) {
               try {
-                turnResult = await streamOneTurn(config);
+                turnResult = await streamOneTurn(config, activeProcessingMode, activeRequestBuildMode);
                 if (!turnResult.retryableNoToolCall) {
                   break;
                 }
@@ -1291,6 +1584,18 @@
                   limitErr.retryLimitReached = true;
                   throw limitErr;
                 }
+                const retryUserMessage = buildRetryUserMessage({
+                  type: "max_tokens_without_tool_call",
+                  maxTokens: turnResult.maxTokens,
+                  finishReason: turnResult.finishReason
+                }, activeProcessingMode);
+                if (retryUserMessage) {
+                  state.messages.push({
+                    role: "user",
+                    content: retryUserMessage
+                  });
+                  appendLog("[Retry Hint] Added user guidance about previous max-token failure.\n");
+                }
               } catch (err) {
                 if (err && err.name === "AbortError") {
                   throw err;
@@ -1300,6 +1605,14 @@
                 }
                 retryCount += 1;
                 const message = String((err && err.message) || err || "Unknown error");
+                if (
+                  activeProcessingMode === PROCESSING_MODE_TOOL_CALL &&
+                  isLikelyToolUnsupportedMessage(message)
+                ) {
+                  throw new Error(
+                    `Tool call mode is not supported by this endpoint/model. Please switch Processing Mode to response_parsing and retry. Last error: ${message.slice(0, 280)}`
+                  );
+                }
                 appendLog(
                   `[Retry] Turn ${turn}: invalid response (${message.slice(0, 280)}). Retrying ${retryCount}/${MAX_TOOL_CALL_RETRIES_PER_TURN}...\n`
                 );
@@ -1307,6 +1620,17 @@
                   throw new Error(
                     `Turn ${turn} retried ${MAX_TOOL_CALL_RETRIES_PER_TURN} times due to invalid response. Last error: ${message.slice(0, 280)}`
                   );
+                }
+                const failureType = classifyTurnFailure(message);
+                if (failureType) {
+                  const retryUserMessage = buildRetryUserMessage({ type: failureType }, activeProcessingMode);
+                  if (retryUserMessage) {
+                    state.messages.push({
+                      role: "user",
+                      content: retryUserMessage
+                    });
+                    appendLog(`[Retry Hint] Added user guidance about previous failure: ${failureType}.\n`);
+                  }
                 }
               }
             }
@@ -1331,37 +1655,20 @@
               appendLog("[Duplicate Guess] Already attempted. Attempt not consumed.\n");
               appendLog(`[History Count] ${historySummary}\n`);
               renderAttempt(turn, guess, rejectReason, "DUPLICATE", false, turnResult.timing, historySummary, usageForHistory, false);
-
-              state.messages.push({
-                role: "assistant",
-                content: turnResult.thought,
-                tool_calls: [
-                  {
-                    id: turnResult.toolCall.id,
-                    type: "function",
-                    function: {
-                      name: "submit_guess",
-                      arguments: turnResult.toolCall.function.arguments
-                    }
-                  }
-                ]
-              });
-
-              state.messages.push({
-                role: "tool",
-                tool_call_id: turnResult.toolCall.id,
-                content: JSON.stringify({
-                  guess,
-                  feedback_facts: getFeedbackFactsSnapshot(),
-                  error: "Guess already tried. Check guess_history and submit a new word.",
-                  already_tried: true,
-                  consumes_attempt: false,
-                  turn,
-                  attempts_used: state.attemptCount,
-                  attempts_remaining: MAX_ATTEMPTS - state.attemptCount,
-                  guess_history: triedHistory,
-                  history_count: triedHistory.length
-                })
+              pushAssistantTurnMessage(turnResult, activeProcessingMode);
+              pushFeedbackMessage(turnResult, activeProcessingMode, {
+                guess,
+                feedback_facts: getFeedbackFactsSnapshot(),
+                error: "Guess already tried. Check guess_history and submit a new word.",
+                already_tried: true,
+                consumes_attempt: false,
+                turn,
+                attempts_used: state.attemptCount,
+                attempts_remaining: state.maxAttempts - state.attemptCount,
+                remaining_turns: state.maxAttempts - state.attemptCount,
+                total_turns: state.maxAttempts,
+                guess_history: triedHistory,
+                history_count: triedHistory.length
               });
               continue;
             }
@@ -1390,35 +1697,23 @@
               : `${turnResult.reason ? `${turnResult.reason} ` : ""}(Out-of-list guess accepted and checked normally.)`;
             renderAttempt(turn, guess, renderReason, pattern, true, turnResult.timing, historySummary, usageForHistory);
 
-            state.messages.push({
-              role: "assistant",
-              content: turnResult.thought,
-              tool_calls: [
-                {
-                  id: turnResult.toolCall.id,
-                  type: "function",
-                  function: {
-                    name: "submit_guess",
-                    arguments: turnResult.toolCall.function.arguments
-                  }
-                }
-              ]
-            });
-
-            state.messages.push({
-              role: "tool",
-              tool_call_id: turnResult.toolCall.id,
-              content: JSON.stringify({
-                guess,
-                pattern,
-                positions: statuses,
-                feedback_facts: feedbackFacts,
-                in_word_list: inWordList,
-                solved: guess === state.secret,
-                note: "G = correct place, Y = letter exists elsewhere, B = letter absent",
-                guess_history: triedHistory,
-                history_count: triedHistory.length
-              })
+            pushAssistantTurnMessage(turnResult, activeProcessingMode);
+            const attemptsUsed = state.attemptCount + 1;
+            pushFeedbackMessage(turnResult, activeProcessingMode, {
+              guess,
+              pattern,
+              positions: statuses,
+              feedback_facts: feedbackFacts,
+              in_word_list: inWordList,
+              solved: guess === state.secret,
+              note: "G = correct place, Y = letter exists elsewhere, B = letter absent",
+              turn,
+              attempts_used: attemptsUsed,
+              attempts_remaining: state.maxAttempts - attemptsUsed,
+              remaining_turns: state.maxAttempts - attemptsUsed,
+              total_turns: state.maxAttempts,
+              guess_history: triedHistory,
+              history_count: triedHistory.length
             });
 
             state.attemptCount += 1;
@@ -1431,8 +1726,8 @@
             }
           }
 
-          if (state.running && state.attemptCount >= MAX_ATTEMPTS) {
-            setStatus(`No solve in ${MAX_ATTEMPTS} turns. Secret word: ${state.secret.toUpperCase()}.`);
+          if (state.running && state.attemptCount >= state.maxAttempts) {
+            setStatus(`No solve in ${state.maxAttempts} turns. Secret word: ${state.secret.toUpperCase()}.`);
             state.running = false;
             outcome = "loss";
           }
@@ -1491,6 +1786,13 @@
       dom.startBtn.addEventListener("click", () => {
         runGame({ autoTriggered: false });
       });
+      dom.maxAttempts.addEventListener("change", () => {
+        const parsed = parseMaxAttempts(dom.maxAttempts.value);
+        dom.maxAttempts.value = String(parsed);
+        if (!state.running) {
+          createBoard(parsed);
+        }
+      });
       dom.stopBtn.addEventListener("click", stopGame);
       dom.saveBtn.addEventListener("click", saveConfig);
       dom.themeToggle.addEventListener("click", toggleThemeOverride);
@@ -1498,7 +1800,10 @@
       initTheme();
       loadConfig();
       loadStats();
-      createBoard();
+      const initialMaxAttempts = parseMaxAttempts(dom.maxAttempts.value);
+      dom.maxAttempts.value = String(initialMaxAttempts);
+      state.maxAttempts = initialMaxAttempts;
+      createBoard(initialMaxAttempts);
       appendLog("Ready. Click Start New Game.\n");
       appendLog(`Word list loaded: ${WORD_LIST.length} words.\n`);
     </script>
