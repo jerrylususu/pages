@@ -515,6 +515,216 @@
         .performance-warning button:hover {
             background: var(--button-primary-hover);
         }
+
+        .view-toggle {
+            display: flex;
+            gap: 5px;
+        }
+
+        .view-toggle button {
+            padding: 8px 16px;
+            background: var(--button-secondary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+
+        .view-toggle button:hover {
+            background: var(--button-secondary-hover);
+        }
+
+        .view-toggle button.active {
+            background: var(--button-primary);
+        }
+
+        .time-granularity {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .time-granularity label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .time-granularity select {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .calendar-container {
+            display: none;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 70vh;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+        }
+
+        .calendar-container.active {
+            display: block;
+        }
+
+        .calendar-grid {
+            display: grid;
+            min-width: 100%;
+        }
+
+        .calendar-header-row {
+            display: contents;
+        }
+
+        .calendar-time-header {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            min-width: 60px;
+            width: 60px;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            padding: 10px 5px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            min-width: 140px;
+        }
+
+        .calendar-day-header .day-number {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .calendar-day-header .day-name {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .calendar-day-header .day-date {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .calendar-time-label {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 2px 5px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: right;
+            min-width: 60px;
+            width: 60px;
+            height: 30px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+        }
+
+        .calendar-day-column {
+            position: relative;
+            border-right: 1px solid var(--border-color);
+            min-width: 140px;
+        }
+
+        .calendar-time-slot {
+            height: 30px;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .calendar-time-slot.hour-boundary {
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .calendar-session-block {
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-size: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            z-index: 2;
+            transition: opacity 0.15s;
+            line-height: 1.2;
+        }
+
+        .calendar-session-block:hover {
+            opacity: 0.85;
+            z-index: 3;
+        }
+
+        .calendar-session-block .session-task-name {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .calendar-session-block .session-duration {
+            font-size: 10px;
+            font-weight: 600;
+            color: inherit;
+        }
+
+        .calendar-session-tooltip {
+            display: none;
+            position: fixed;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 14px;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            z-index: 1000;
+            pointer-events: none;
+            max-width: 280px;
+        }
+
+        .calendar-session-tooltip.show {
+            display: block;
+        }
+
+        .calendar-session-tooltip .tooltip-task {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .calendar-session-tooltip .tooltip-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+        }
+
+        .calendar-session-tooltip .tooltip-duration {
+            font-size: 12px;
+            color: var(--stat-blue);
+            font-weight: 500;
+        }
+
+        .chart-container.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -552,7 +762,21 @@
                 <button onclick="navigateToNextDay()">Next Day →</button>
             </div>
             
-            <div class="height-control">
+            <div class="view-toggle">
+                <button id="timelineViewBtn" class="active" onclick="switchView('timeline')">Timeline</button>
+                <button id="calendarViewBtn" onclick="switchView('calendar')">Calendar</button>
+            </div>
+
+            <div class="time-granularity" id="timeGranularityControl" style="display: none;">
+                <label for="timeGranularity">Granularity:</label>
+                <select id="timeGranularity" onchange="updateVisualization()">
+                    <option value="15">15 min</option>
+                    <option value="30">30 min</option>
+                    <option value="60" selected>1 hour</option>
+                </select>
+            </div>
+
+            <div class="height-control" id="heightControl">
                 <label for="chartHeight">Chart height:</label>
                 <input type="range" id="chartHeight" min="300" max="1200" value="500" step="50">
                 <span id="heightValue">500px</span>
@@ -565,8 +789,18 @@
                 <p id="performanceWarningText">This dataset contains more than 50 sessions. Rendering all sessions at once may cause the page to become slow or unresponsive.</p>
                 <button onclick="renderVisualization()">Dismiss</button>
             </div>
-            <div class="chart-container">
+            <div class="chart-container" id="timelineContainer">
                 <div id="timerChart"></div>
+            </div>
+
+            <div class="calendar-container" id="calendarContainer">
+                <div id="calendarGrid" class="calendar-grid"></div>
+            </div>
+
+            <div class="calendar-session-tooltip" id="calendarTooltip">
+                <div class="tooltip-task" id="tooltipTask"></div>
+                <div class="tooltip-time" id="tooltipTime"></div>
+                <div class="tooltip-duration" id="tooltipDuration"></div>
             </div>
             
             <div class="stats" id="statsContainer"></div>
@@ -693,7 +927,12 @@
                     document.getElementById('chartWrapper').style.display = 'block';
                     hasRendered = false;
 
-                    setThisWeekRange(false);
+                    const autoRange = autoDetectDateTimeRange(timerData);
+                    if (autoRange) {
+                        currentDateTimeRange = autoRange;
+                        document.getElementById('startDateTime').value = formatDateTimeLocal(autoRange.start);
+                        document.getElementById('endDateTime').value = formatDateTimeLocal(autoRange.end);
+                    }
 
                     // Check if we need to show performance warning
                     if (totalSessionCount > SESSION_THRESHOLD) {
@@ -937,13 +1176,17 @@
         function updateVisualization() {
             if (!timerData) return;
             
-            console.log('updateVisualization:', { currentDateTimeRange });
+            console.log('updateVisualization:', { currentDateTimeRange, currentView });
             
             const filteredData = filterDataByDateTime(timerData, currentDateTimeRange);
             
             console.log('Filtered data for visualization:', filteredData);
             
-            updateChart(filteredData);
+            if (currentView === 'calendar') {
+                updateCalendarView(filteredData);
+            } else {
+                updateChart(filteredData);
+            }
             updateStats(filteredData);
             updateTaskList(filteredData);
             updateMarkdownTable(filteredData);
@@ -1443,6 +1686,28 @@
             updateVisualization();
         }
         
+        function autoDetectDateTimeRange(data) {
+            let earliestStart = Infinity;
+            let latestEnd = -Infinity;
+
+            data.value.forEach(task => {
+                task.sessions.forEach(session => {
+                    if (session[0] < earliestStart) earliestStart = session[0];
+                    if (session[1] > latestEnd) latestEnd = session[1];
+                });
+            });
+
+            if (earliestStart === Infinity) return null;
+
+            const startDate = new Date(earliestStart * 1000);
+            const endDate = new Date(latestEnd * 1000);
+
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+
+            return { start: startDate, end: endDate };
+        }
+
         function autoFitDateTimeRange() {
             if (!timerData) return;
             
@@ -1713,6 +1978,276 @@
                 closeCropModal();
             }
         };
+
+        // ==================== Calendar View ====================
+        let currentView = 'timeline';
+
+        function switchView(view) {
+            currentView = view;
+            const timelineBtn = document.getElementById('timelineViewBtn');
+            const calendarBtn = document.getElementById('calendarViewBtn');
+            const timelineContainer = document.getElementById('timelineContainer');
+            const calendarContainer = document.getElementById('calendarContainer');
+            const timeGranularityControl = document.getElementById('timeGranularityControl');
+            const heightControl = document.getElementById('heightControl');
+
+            if (view === 'calendar') {
+                timelineBtn.classList.remove('active');
+                calendarBtn.classList.add('active');
+                timelineContainer.classList.add('hidden');
+                calendarContainer.classList.add('active');
+                timeGranularityControl.style.display = 'flex';
+                heightControl.style.display = 'none';
+            } else {
+                timelineBtn.classList.add('active');
+                calendarBtn.classList.remove('active');
+                timelineContainer.classList.remove('hidden');
+                calendarContainer.classList.remove('active');
+                timeGranularityControl.style.display = 'none';
+                heightControl.style.display = 'flex';
+            }
+
+            if (timerData) {
+                updateVisualization();
+            }
+        }
+
+        function contrastColor(hex) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminance > 0.55 ? '#222222' : '#ffffff';
+        }
+
+        function assignLanes(sessions) {
+            if (sessions.length === 0) return { sessions: [], totalLanes: 0 };
+
+            const sorted = [...sessions].sort((a, b) =>
+                a.startMinutes - b.startMinutes || b.durationMinutes - a.durationMinutes
+            );
+
+            const laneEnds = [];
+
+            sorted.forEach(session => {
+                let assignedLane = -1;
+                for (let lane = 0; lane < laneEnds.length; lane++) {
+                    if (session.startMinutes >= laneEnds[lane]) {
+                        assignedLane = lane;
+                        break;
+                    }
+                }
+                if (assignedLane === -1) {
+                    assignedLane = laneEnds.length;
+                    laneEnds.push(0);
+                }
+                laneEnds[assignedLane] = session.endMinutes;
+                session.lane = assignedLane;
+            });
+
+            const totalLanes = Math.max(laneEnds.length, 1);
+            return { sessions: sorted, totalLanes };
+        }
+
+        function updateCalendarView(data) {
+            const gridEl = document.getElementById('calendarGrid');
+            const granularity = parseInt(document.getElementById('timeGranularity').value);
+            const slotHeight = 30;
+
+            if (!currentDateTimeRange || data.value.length === 0) {
+                gridEl.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-secondary);">Select a date range to view the calendar</div>';
+                return;
+            }
+
+            const startDate = new Date(currentDateTimeRange.start);
+            const endDate = new Date(currentDateTimeRange.end);
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
+
+            const days = [];
+            const currentDay = new Date(startDate);
+            while (currentDay <= endDate) {
+                days.push(new Date(currentDay));
+                currentDay.setDate(currentDay.getDate() + 1);
+            }
+
+            const slotsPerDay = (24 * 60) / granularity;
+            const totalHeight = slotsPerDay * slotHeight;
+
+            const colors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF',
+                '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
+                '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+            ];
+
+            const taskColorMap = {};
+            data.value.forEach((task, index) => {
+                taskColorMap[task.name] = colors[index % colors.length];
+            });
+
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            const colTemplate = `60px repeat(${days.length}, minmax(140px, 1fr))`;
+
+            let html = '';
+
+            html += `<div style="display: grid; grid-template-columns: ${colTemplate}; grid-template-rows: auto repeat(${slotsPerDay}, ${slotHeight}px); position: relative;">`;
+
+            html += `<div class="calendar-time-header" style="grid-column: 1; grid-row: 1;"></div>`;
+            days.forEach((day, i) => {
+                const isToday = day.toDateString() === new Date().toDateString();
+                html += `<div class="calendar-day-header" style="grid-column: ${i + 2}; grid-row: 1; ${isToday ? 'background: var(--button-primary); color: white;' : ''}">
+                    <div class="day-number">${day.getDate()}</div>
+                    <div class="day-name">${dayNames[day.getDay()]}</div>
+                    <div class="day-date">${monthNames[day.getMonth()]} ${day.getFullYear()}</div>
+                </div>`;
+            });
+
+            for (let slot = 0; slot < slotsPerDay; slot++) {
+                const hour = Math.floor((slot * granularity) / 60);
+                const minute = (slot * granularity) % 60;
+                const isHourBoundary = minute === 0;
+                const gridRow = slot + 2;
+
+                const timeLabel = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                html += `<div class="calendar-time-label" style="grid-column: 1; grid-row: ${gridRow};">${isHourBoundary ? timeLabel : ''}</div>`;
+
+                days.forEach((day, dayIndex) => {
+                    const slotClass = isHourBoundary ? 'calendar-time-slot hour-boundary' : 'calendar-time-slot';
+                    html += `<div class="${slotClass}" style="grid-column: ${dayIndex + 2}; grid-row: ${gridRow}; position: relative;"></div>`;
+                });
+            }
+
+            days.forEach((day, dayIndex) => {
+                const dayStart = new Date(day);
+                const dayEnd = new Date(day);
+                dayEnd.setHours(23, 59, 59, 999);
+
+                const daySessions = [];
+                data.value.forEach(task => {
+                    task.sessions.forEach(session => {
+                        const sessionStart = new Date(session[0] * 1000);
+                        const sessionEnd = new Date(session[1] * 1000);
+
+                        if (sessionStart > dayEnd || sessionEnd < dayStart) return;
+
+                        const effectiveStart = sessionStart < dayStart ? dayStart : sessionStart;
+                        const effectiveEnd = sessionEnd > dayEnd ? dayEnd : sessionEnd;
+
+                        const startMinutes = effectiveStart.getHours() * 60 + effectiveStart.getMinutes();
+                        const endMinutes = effectiveEnd.getHours() * 60 + effectiveEnd.getMinutes();
+                        const durationMinutes = endMinutes - startMinutes;
+
+                        if (durationMinutes <= 0) return;
+
+                        daySessions.push({
+                            taskName: task.name,
+                            startMinutes,
+                            endMinutes,
+                            durationMinutes,
+                            sessionStart,
+                            sessionEnd,
+                            color: taskColorMap[task.name]
+                        });
+                    });
+                });
+
+                const { sessions: lanedSessions, totalLanes } = assignLanes(daySessions);
+
+                if (lanedSessions.length === 0) return;
+
+                html += `<div style="grid-column: ${dayIndex + 2}; grid-row: 2 / span ${slotsPerDay}; position: relative; z-index: 1; pointer-events: none;">`;
+
+                lanedSessions.forEach(session => {
+                    const topPx = (session.startMinutes / granularity) * slotHeight;
+                    const heightPx = Math.max((session.durationMinutes / granularity) * slotHeight, 16);
+                    const laneWidth = 100 / totalLanes;
+                    const leftPercent = session.lane * laneWidth;
+                    const widthPercent = laneWidth;
+                    const padding = 2;
+                    const durationStr = formatTimeShort(Math.round(session.durationMinutes));
+
+                    html += `<div class="calendar-session-block" 
+                        style="position: absolute; top: ${topPx}px; height: ${heightPx}px; left: calc(${leftPercent}% + ${padding}px); width: calc(${widthPercent}% - ${padding * 2}px); background-color: ${session.color}; color: ${contrastColor(session.color)}; pointer-events: auto; z-index: 2;"
+                        data-task="${session.taskName}"
+                        data-start="${session.sessionStart.toISOString()}"
+                        data-end="${session.sessionEnd.toISOString()}"
+                        data-duration="${session.durationMinutes}"
+                        onmouseenter="showCalendarTooltip(event, this)"
+                        onmouseleave="hideCalendarTooltip()"
+                        onclick="highlightTask('${session.taskName.replace(/'/g, "\\'")}')">
+                        <div class="session-task-name">${session.taskName}</div>
+                        ${heightPx >= 40 ? `<div class="session-duration">${durationStr}</div>` : ''}
+                    </div>`;
+                });
+
+                html += `</div>`;
+            });
+
+            html += `</div>`;
+
+            gridEl.innerHTML = html;
+        }
+
+        function formatTimeShort(minutes) {
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            if (hours > 0 && mins > 0) return `${hours}h${mins}m`;
+            if (hours > 0) return `${hours}h`;
+            return `${mins}m`;
+        }
+
+        function showCalendarTooltip(event, el) {
+            const tooltip = document.getElementById('calendarTooltip');
+            const taskName = el.getAttribute('data-task');
+            const startTime = new Date(el.getAttribute('data-start'));
+            const endTime = new Date(el.getAttribute('data-end'));
+            const duration = parseInt(el.getAttribute('data-duration'));
+
+            document.getElementById('tooltipTask').textContent = taskName;
+            document.getElementById('tooltipTime').textContent = `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`;
+            document.getElementById('tooltipDuration').textContent = formatTimeShort(duration);
+
+            tooltip.classList.add('show');
+
+            const rect = el.getBoundingClientRect();
+            let left = rect.right + 10;
+            let top = rect.top;
+
+            if (left + 280 > window.innerWidth) {
+                left = rect.left - 290;
+            }
+            if (left < 0) left = 10;
+
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        function hideCalendarTooltip() {
+            document.getElementById('calendarTooltip').classList.remove('show');
+        }
+
+        function highlightTask(taskName) {
+            const blocks = document.querySelectorAll('.calendar-session-block');
+            blocks.forEach(block => {
+                if (block.getAttribute('data-task') === taskName) {
+                    block.style.opacity = '1';
+                    block.style.boxShadow = '0 0 0 2px white, 0 0 8px rgba(0,0,0,0.3)';
+                } else {
+                    block.style.opacity = '0.3';
+                    block.style.boxShadow = 'none';
+                }
+            });
+
+            setTimeout(() => {
+                blocks.forEach(block => {
+                    block.style.opacity = '';
+                    block.style.boxShadow = '';
+                });
+            }, 2000);
+        }
     </script>
 </body>
 </html>
