@@ -598,11 +598,16 @@
             text-align: center;
             padding: 10px 5px;
             border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
             background: var(--bg-card);
             position: sticky;
             top: 0;
             z-index: 5;
             min-width: 140px;
+        }
+
+        .calendar-day-header:last-child {
+            border-right: none;
         }
 
         .calendar-day-header .day-number {
@@ -650,6 +655,7 @@
         .calendar-time-slot {
             height: 30px;
             border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
             position: relative;
         }
 
@@ -1268,8 +1274,9 @@
             
             const traces = [];
             const colors = [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
-                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                // Material Design 300 palette (soft, distinct hues)
+                '#E57373', '#64B5F6', '#81C784', '#FFB74D',
+                '#BA68C8', '#4DD0E1', '#F06292', '#9575CD'
             ];
             
             // Add [ACTIVE] pseudo task that combines all active sessions
@@ -2075,10 +2082,11 @@
             const totalHeight = slotsPerDay * slotHeight;
 
             const colors = [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
-                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF',
-                '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
-                '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+                // Material Design 300 palette (soft, distinct hues)
+                '#E57373', '#64B5F6', '#81C784', '#FFB74D',
+                '#BA68C8', '#4DD0E1', '#F06292', '#9575CD',
+                '#4FC3F7', '#AED581', '#FFD54F', '#A1887F',
+                '#90A4AE', '#DCE775', '#FF8A65', '#80CBC4'
             ];
 
             const taskColorMap = {};
