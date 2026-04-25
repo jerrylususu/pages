@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timer Visualization - Plotly</title>
-    <script src="https://cdn.plot.ly/plotly-3.1.0.min.js"></script>
+    <title>Timer Visualization</title>
     <style>
         * {
             margin: 0;
@@ -854,6 +853,25 @@
         let totalSessionCount = 0;
         const SESSION_THRESHOLD = 50;
         let hasRendered = false;
+        let plotlyLoaded = false;
+        const PLOTLY_TIMEOUT = 5000;
+
+        (function loadPlotly() {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.plot.ly/plotly-3.1.0.min.js';
+            script.async = true;
+            script.onload = () => { plotlyLoaded = true; };
+            script.onerror = () => {
+                console.warn('Plotly failed to load. Timeline view will be unavailable. Falling back to Calendar view.');
+            };
+            document.head.appendChild(script);
+
+            setTimeout(() => {
+                if (!plotlyLoaded) {
+                    console.warn(`Plotly load timed out after ${PLOTLY_TIMEOUT}ms. Falling back to Calendar view.`);
+                }
+            }, PLOTLY_TIMEOUT);
+        })();
         
         // Theme management
         function initTheme() {
@@ -897,8 +915,7 @@
             const height = this.value;
             document.getElementById('heightValue').textContent = height + 'px';
             document.querySelector('.chart-container').style.height = height + 'px';
-            if (timerData) {
-                // Use Plotly's relayout to properly resize the chart
+            if (timerData && plotlyLoaded) {
                 Plotly.relayout('timerChart', {
                     height: parseInt(height)
                 });
@@ -1181,6 +1198,18 @@
         
         function updateVisualization() {
             if (!timerData) return;
+            
+            // Auto-fallback to calendar if Plotly not loaded
+            if (currentView === 'timeline' && !plotlyLoaded) {
+                console.warn('Plotly not available, auto-switching to calendar view');
+                currentView = 'calendar';
+                document.getElementById('timelineViewBtn').classList.remove('active');
+                document.getElementById('calendarViewBtn').classList.add('active');
+                document.getElementById('timelineContainer').classList.add('hidden');
+                document.getElementById('calendarContainer').classList.add('active');
+                document.getElementById('timeGranularityControl').style.display = 'flex';
+                document.getElementById('heightControl').style.display = 'none';
+            }
             
             console.log('updateVisualization:', { currentDateTimeRange, currentView });
             
@@ -1990,6 +2019,10 @@
         let currentView = 'timeline';
 
         function switchView(view) {
+            if (view === 'timeline' && !plotlyLoaded) {
+                alert('Timeline view requires the Plotly library, which is not available. Falling back to Calendar view. Please check your internet connection and reload the page if needed.');
+                return;
+            }
             currentView = view;
             const timelineBtn = document.getElementById('timelineViewBtn');
             const calendarBtn = document.getElementById('calendarViewBtn');
